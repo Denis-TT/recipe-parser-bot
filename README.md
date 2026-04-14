@@ -21,4 +21,4 @@ Telegram бот для автоматического парсинга и нор
 
 - Python 3.8 или выше
 - Telegram Bot Token (получить у [@BotFather](https://t.me/botfather))
-- GitHub Token с доступом к Models
+- GitHub Token с доступом к Models# recipe-parser-bot
