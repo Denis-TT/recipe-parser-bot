@@ -3,49 +3,50 @@ import os
 import sys
 import logging
 from pathlib import Path
-from dotenv import load_dotenv
 
-# Загружаем .env файл
-load_dotenv()
+# Загружаем .env только для локальной разработки
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # На Railway dotenv не нужен
 
-# Добавляем src в путь ДО импортов
+# Добавляем src в путь
 sys.path.insert(0, str(Path(__file__).parent / 'src'))
 
-# Теперь импортируем из src
 from bot import RecipeBot
 
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler('bot.log', encoding='utf-8')
-    ]
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
 logger = logging.getLogger(__name__)
 
 def main():
-    telegram_token = os.getenv("TELEGRAM_BOT_TOKEN")
-    github_token = os.getenv("GITHUB_TOKEN")
+    # Railway передает переменные через os.environ
+    telegram_token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    github_token = os.environ.get("GITHUB_TOKEN")
     
     if not telegram_token:
-        logger.error("❌ TELEGRAM_BOT_TOKEN не найден в .env файле")
+        logger.error("❌ TELEGRAM_BOT_TOKEN не найден в переменных окружения")
+        logger.info("Добавьте переменные в Railway Dashboard → Variables")
         sys.exit(1)
     
     if not github_token:
-        logger.error("❌ GITHUB_TOKEN не найден в .env файле")
+        logger.error("❌ GITHUB_TOKEN не найден в переменных окружения")
         sys.exit(1)
     
-    logger.info("✅ Токены загружены. Запуск бота...")
+    logger.info("✅ Токены загружены из переменных окружения")
+    logger.info("🚀 Запуск бота...")
     
     try:
         bot = RecipeBot(telegram_token, github_token)
         bot.run()
     except KeyboardInterrupt:
-        logger.info("👋 Бот остановлен пользователем")
+        logger.info("👋 Бот остановлен")
     except Exception as e:
-        logger.error(f"❌ Критическая ошибка: {e}", exc_info=True)
+        logger.error(f"❌ Ошибка: {e}", exc_info=True)
         sys.exit(1)
 
 if __name__ == "__main__":
