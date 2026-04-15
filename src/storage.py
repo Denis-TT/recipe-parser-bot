@@ -147,3 +147,23 @@ class RecipeStorage:
     def get_category_name(self, category_key: str) -> str:
         """Получение названия категории"""
         return self.categories.get(category_key, category_key)
+
+    def get_recipe_by_filename(self, user_id: int, filename: str) -> Optional[Dict[str, Any]]:
+        """Поиск рецепта по имени файла во всех категориях"""
+        user_dir = os.path.join(self.storage_dir, str(user_id))
+        
+        if not os.path.exists(user_dir):
+            return None
+        
+        for category in os.listdir(user_dir):
+            cat_dir = os.path.join(user_dir, category)
+            if os.path.isdir(cat_dir):
+                filepath = os.path.join(cat_dir, filename)
+                if os.path.exists(filepath):
+                    try:
+                        with open(filepath, 'r', encoding='utf-8') as f:
+                            return json.load(f)
+                    except:
+                        pass
+        
+        return None
