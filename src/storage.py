@@ -1,5 +1,8 @@
 import os
 import json
+import hashlib
+import re
+import uuid
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 
@@ -43,9 +46,10 @@ class RecipeStorage:
         """Сохранение рецепта для пользователя"""
         user_dir = os.path.join(self.storage_dir, str(user_id))
         os.makedirs(user_dir, exist_ok=True)
+        recipe_to_save = dict(recipe)
         
         # Определяем категорию
-        meal_type = recipe.get('meal_type', 'other').lower()
+        meal_type = recipe_to_save.get('meal_type', 'other').lower()
         category = self.meal_type_to_category.get(meal_type, 'other')
         
         # Создаем подпапку категории
@@ -53,14 +57,14 @@ class RecipeStorage:
         os.makedirs(category_dir, exist_ok=True)
         
         # Добавляем метаданные сохранения
-        recipe['saved_at'] = datetime.now().isoformat()
-        recipe['user_id'] = user_id
-        recipe['category'] = category
+        recipe_to_save['saved_at'] = datetime.now().isoformat()
+        recipe_to_save['user_id'] = user_id
+        recipe_to_save['category'] = category
+        recipe_to_save['recipe_uid'] = recipe_to_save.get('recipe_uid') or uuid.uuid4().hex[:10]
         
         # Создаем имя файла
-        title = recipe.get('title', 'recipe')[:30]
-        safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_'))
-        safe_title = safe_title.replace(' ', '_')
+        title = recipe_to_save.get('title', 'recipe')[:40]
+        safe_title = self._safe_title_for_filename(title)
         
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         filename = f"{safe_title}_{timestamp}.json"
@@ -68,7 +72,7 @@ class RecipeStorage:
         
         # Сохраняем
         with open(filepath, 'w', encoding='utf-8') as f:
-            json.dump(recipe, f, ensure_ascii=False, indent=2)
+            json.dump(recipe_to_save, f, ensure_ascii=False, indent=2)
         
         return filepath
     
@@ -112,6 +116,7 @@ class RecipeStorage:
                             'title': recipe.get('title', 'Без названия'),
                             'saved_at': recipe.get('saved_at', ''),
                             'filename': filename,
+                            'recipe_uid': recipe.get('recipe_uid', self._fallback_uid(filename)),
                             'calories': recipe.get('nutrition_per_serving', {}).get('calories', 0),
                             'cook_time': recipe.get('total_time', 0)
                         })
@@ -123,7 +128,8 @@ class RecipeStorage:
     
     def get_recipe(self, user_id: int, category: str, filename: str) -> Optional[Dict[str, Any]]:
         """Получение полного рецепта"""
-        filepath = os.path.join(self.storage_dir, str(user_id), category, filename)
+        safe_filename = os.path.basename(filename)
+        filepath = os.path.join(self.storage_dir, str(user_id), category, safe_filename)
         
         if os.path.exists(filepath):
             try:
@@ -136,7 +142,8 @@ class RecipeStorage:
     
     def delete_recipe(self, user_id: int, category: str, filename: str) -> bool:
         """Удаление рецепта"""
-        filepath = os.path.join(self.storage_dir, str(user_id), category, filename)
+        safe_filename = os.path.basename(filename)
+        filepath = os.path.join(self.storage_dir, str(user_id), category, safe_filename)
         
         if os.path.exists(filepath):
             os.remove(filepath)
@@ -167,3 +174,25 @@ class RecipeStorage:
                         pass
         
         return None
+
+    def get_recipe_by_uid(self, user_id: int, category: str, recipe_uid: str) -> Optional[Dict[str, Any]]:
+        """Поиск рецепта по короткому UID внутри категории."""
+        for recipe in self.get_recipes_in_category(user_id, category):
+            if recipe.get("recipe_uid") == recipe_uid:
+                return self.get_recipe(user_id, category, recipe.get("filename", ""))
+        return None
+
+    def delete_recipe_by_uid(self, user_id: int, category: str, recipe_uid: str) -> bool:
+        """Удаление рецепта по UID внутри категории."""
+        for recipe in self.get_recipes_in_category(user_id, category):
+            if recipe.get("recipe_uid") == recipe_uid:
+                return self.delete_recipe(user_id, category, recipe.get("filename", ""))
+        return False
+
+    def _safe_title_for_filename(self, value: str) -> str:
+        normalized = re.sub(r"[^a-zA-Z0-9 _-]+", "", value)
+        normalized = re.sub(r"\s+", "_", normalized).strip("_")
+        return normalized[:30] or "recipe"
+
+    def _fallback_uid(self, filename: str) -> str:
+        return hashlib.sha1(filename.encode("utf-8")).hexdigest()[:10]
