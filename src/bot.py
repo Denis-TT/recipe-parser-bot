@@ -3,9 +3,10 @@ import logging
 from typing import Optional, Dict, Any
 from datetime import datetime
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton, BotCommand
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from telegram.constants import ParseMode
+from telegram.helpers import escape_markdown
 
 from parser import RecipeParser
 from normalizer_github import GitHubModelNormalizer
@@ -25,9 +26,13 @@ class RecipeBot:
         self.temp_recipes: Dict[int, Dict[str, Any]] = {}
     
     def get_main_keyboard(self) -> ReplyKeyboardMarkup:
+        keyboard = [[KeyboardButton("📋 Меню")]]
+        return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
+    def get_menu_keyboard(self) -> ReplyKeyboardMarkup:
         keyboard = [
             [KeyboardButton("📚 Сохраненные рецепты"), KeyboardButton("ℹ️ Помощь")],
-            [KeyboardButton("📋 Меню")],
+            [KeyboardButton("⬅️ Назад")],
         ]
         return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     
@@ -41,27 +46,22 @@ class RecipeBot:
         return InlineKeyboardMarkup(keyboard)
     
     async def setup_commands(self, application: Application):
-        commands = [
-            BotCommand("start", "🚀 Начать работу"),
-            BotCommand("menu", "📋 Показать меню"),
-            BotCommand("saved", "📚 Сохраненные рецепты"),
-            BotCommand("help", "ℹ️ Помощь"),
-        ]
-        await application.bot.set_my_commands(commands)
+        # Убираем командное меню (кнопку "/" в Telegram), оставляя только reply-клавиатуру.
+        await application.bot.set_my_commands([])
     
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         welcome_text = "👨‍🍳 *Привет, шеф-повар!*\n\nЯ бот для парсинга и сохранения рецептов.\n\n*Что я умею:*\n• Извлекать рецепты с любых сайтов\n• Определять тип блюда и КБЖУ\n• Сохранять рецепты в избранное\n\nОтправь мне ссылку на рецепт или используй кнопки ниже!"
         await update.message.reply_text(welcome_text, parse_mode=ParseMode.MARKDOWN, reply_markup=self.get_main_keyboard())
     
     async def menu_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        await update.message.reply_text("📋 *Главное меню*\n\nИспользуйте кнопки ниже для навигации:\n• 📚 Сохраненные рецепты - просмотр избранного\n• ℹ️ Помощь - справка\n\n💡 *Чтобы обработать рецепт, просто отправьте ссылку на него!*", parse_mode=ParseMode.MARKDOWN, reply_markup=self.get_main_keyboard())
+        await update.message.reply_text("📋 *Главное меню*\n\nИспользуйте кнопки ниже для навигации:\n• 📚 Сохраненные рецепты - просмотр избранного\n• ℹ️ Помощь - справка\n\n💡 *Чтобы обработать рецепт, просто отправьте ссылку на него!*", parse_mode=ParseMode.MARKDOWN, reply_markup=self.get_menu_keyboard())
     
     async def saved_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         await self.show_saved_recipes(update, context)
     
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        help_text = "📚 *Как пользоваться ботом:*\n\n1️⃣ Отправьте ссылку на рецепт\n2️⃣ Бот обработает и покажет результат\n3️⃣ Нажмите '✅ Да' чтобы сохранить рецепт\n\n*Кнопки меню:*\n📚 Сохраненные рецепты - просмотр избранного\nℹ️ Помощь - эта справка\n📋 Меню - показать клавиатуру"
-        await update.message.reply_text(help_text, parse_mode=ParseMode.MARKDOWN, reply_markup=self.get_main_keyboard())
+        help_text = "📚 *Как пользоваться ботом:*\n\n1️⃣ Нажмите «📋 Меню»\n2️⃣ Выберите «📚 Сохраненные рецепты» или отправьте ссылку\n3️⃣ После обработки нажмите «✅ Да», чтобы сохранить рецепт"
+        await update.message.reply_text(help_text, parse_mode=ParseMode.MARKDOWN, reply_markup=self.get_menu_keyboard())
     
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = update.message.text.strip()
@@ -71,6 +71,8 @@ class RecipeBot:
             await self.help_command(update, context)
         elif text == "📋 Меню":
             await self.menu_command(update, context)
+        elif text == "⬅️ Назад":
+            await update.message.reply_text("🏠 Главное окно. Нажмите «📋 Меню», чтобы открыть разделы.", reply_markup=self.get_main_keyboard())
         elif text.startswith(('http://', 'https://')):
             await self.handle_url(update, context)
         else:
@@ -137,24 +139,25 @@ class RecipeBot:
         keyboard = []
         for i, recipe in enumerate(recipes[:15]):
             title = recipe['title'][:40]
-            text += f"{i+1}. *{title}*\n   🔥 {recipe.get('calories', 0)} ккал | ⏱ {recipe.get('cook_time', 0)} мин\n\n"
-            keyboard.append([InlineKeyboardButton(f"📖 {title[:30]}", callback_data=f"view_{category}_{recipe['filename']}")])
+            escaped_title = escape_markdown(title, version=2)
+            text += f"{i+1}. *{escaped_title}*\n   🔥 {recipe.get('calories', 0)} ккал | ⏱ {recipe.get('cook_time', 0)} мин\n\n"
+            keyboard.append([InlineKeyboardButton(f"📖 {title[:30]}", callback_data=f"view_{category}_{recipe['recipe_uid']}")])
         keyboard.append([InlineKeyboardButton("◀️ Назад к категориям", callback_data="back_to_categories")])
-        await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup(keyboard))
-    
-    async def show_recipe(self, query, user_id: int, category: str, filename: str):
-        recipe = self.storage.get_recipe(user_id, category, filename)
+        await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=InlineKeyboardMarkup(keyboard))
+
+    async def show_recipe(self, query, user_id: int, category: str, recipe_uid: str):
+        recipe = self.storage.get_recipe_by_uid(user_id, category, recipe_uid)
         if not recipe:
             await query.edit_message_text("❌ Рецепт не найден")
             return
         formatted = format_recipe_for_telegram(recipe)
         if len(formatted) > 4000:
             formatted = formatted[:4000] + "\n\n_(текст обрезан)_"
-        keyboard = [[InlineKeyboardButton("🗑 Удалить", callback_data=f"delete_{category}_{filename}"), InlineKeyboardButton("◀️ Назад", callback_data=f"cat_{category}")]]
+        keyboard = [[InlineKeyboardButton("🗑 Удалить", callback_data=f"delete_{category}_{recipe_uid}"), InlineKeyboardButton("◀️ Назад", callback_data=f"cat_{category}")]]
         await query.edit_message_text(formatted, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup(keyboard))
-    
-    async def delete_recipe_callback(self, query, user_id: int, category: str, filename: str):
-        if self.storage.delete_recipe(user_id, category, filename):
+
+    async def delete_recipe_callback(self, query, user_id: int, category: str, recipe_uid: str):
+        if self.storage.delete_recipe_by_uid(user_id, category, recipe_uid):
             await query.edit_message_text("✅ *Рецепт удален*", parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("◀️ Назад к категориям", callback_data="back_to_categories")]]))
         else:
             await query.edit_message_text("❌ Не удалось удалить рецепт")
