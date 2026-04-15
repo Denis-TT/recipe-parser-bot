@@ -100,61 +100,99 @@ class RecipeBot:
         user_name = update.effective_user.first_name or "Пользователь"
         data = query.data
         
-        logger.info(f"Callback: {data} from user {user_id}")
+        logger.info(f"📱 Callback получен: '{data}' от пользователя {user_id}")
         
-        # Меню
-        if data == "menu_saved":
-            await self.show_categories(query, user_id, user_name)
-        
-        elif data == "menu_help":
-            await self.show_help(query, user_name)
-        
-        # Сохранение рецепта
-        elif data.startswith("save_"):
-            recipe_id = data.replace("save_", "")
-            await self.save_recipe_callback(query, user_id, user_name, recipe_id)
-        
-        elif data == "dont_save":
-            await query.edit_message_text(f"👌 {user_name}, рецепт не сохранен")
-            if user_id in self.temp_recipes:
-                del self.temp_recipes[user_id]
-        
-        # Навигация по категориям
-        elif data.startswith("cat_"):
-            category = data.replace("cat_", "")
-            await self.show_recipes_in_category(query, user_id, user_name, category)
-        
-        # Просмотр рецепта
-        elif data.startswith("view_"):
-            parts = data.split("_", 2)
-            if len(parts) >= 3:
-                category = parts[1]
-                filename = parts[2]
-                await self.show_recipe(query, user_id, user_name, category, filename)
-        
-        # Удаление рецепта
-        elif data.startswith("delete_"):
-            parts = data.split("_", 2)
-            if len(parts) >= 3:
-                category = parts[1]
-                filename = parts[2]
-                await self.delete_recipe_callback(query, user_id, user_name, category, filename)
-        
-        # Назад к категориям
-        elif data == "back_to_categories":
-            await self.show_categories(query, user_id, user_name)
-        
-        # Назад в меню
-        elif data == "back_to_menu":
-            await query.edit_message_text(
-                f"📋 *{user_name}, главное меню*\n\nВыберите действие:",
-                parse_mode=ParseMode.MARKDOWN,
-                reply_markup=self.get_menu_keyboard()
-            )
+        try:
+            # Меню
+            if data == "menu_saved":
+                logger.info("→ Показываем категории")
+                await self.show_categories(query, user_id, user_name)
+            
+            elif data == "menu_help":
+                logger.info("→ Показываем помощь")
+                await self.show_help(query, user_name)
+            
+            # Сохранение рецепта
+            elif data.startswith("save_"):
+                recipe_id = data.replace("save_", "")
+                logger.info(f"→ Сохраняем рецепт {recipe_id}")
+                await self.save_recipe_callback(query, user_id, user_name, recipe_id)
+            
+            elif data == "dont_save":
+                logger.info("→ Отмена сохранения")
+                await query.edit_message_text(f"👌 {user_name}, рецепт не сохранен")
+                if user_id in self.temp_recipes:
+                    del self.temp_recipes[user_id]
+            
+            # Навигация по категориям
+            elif data.startswith("cat_"):
+                category = data.replace("cat_", "")
+                logger.info(f"→ Открываем категорию: {category}")
+                await self.show_recipes_in_category(query, user_id, user_name, category)
+            
+            # Просмотр рецепта
+            elif data.startswith("view_"):
+                parts = data.split("_", 2)
+                if len(parts) >= 3:
+                    category = parts[1]
+                    filename = parts[2]
+                    logger.info(f"→ Просмотр рецепта: {category}/{filename}")
+                    await self.show_recipe(query, user_id, user_name, category, filename)
+                else:
+                    logger.error(f"❌ Неверный формат view: {data}")
+            
+            # Удаление рецепта
+            elif data.startswith("delete_"):
+                parts = data.split("_", 2)
+                if len(parts) >= 3:
+                    category = parts[1]
+                    filename = parts[2]
+                    logger.info(f"→ Удаление рецепта: {category}/{filename}")
+                    await self.delete_recipe_callback(query, user_id, user_name, category, filename)
+                else:
+                    logger.error(f"❌ Неверный формат delete: {data}")
+            
+            # Назад к категориям
+            elif data == "back_to_categories":
+                logger.info("→ Назад к категориям")
+                await self.show_categories(query, user_id, user_name)
+            
+            # Назад в меню
+            elif data == "back_to_menu":
+                logger.info("→ Назад в меню")
+                await query.edit_message_text(
+                    f"📋 *{user_name}, главное меню*\n\nВыберите действие:",
+                    parse_mode=ParseMode.MARKDOWN,
+                    reply_markup=self.get_menu_keyboard()
+                )
+            
+            else:
+                logger.warning(f"⚠️ Неизвестный callback: {data}")
+                await query.edit_message_text(
+                    f"❌ Неизвестная команда: {data}",
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("📋 В меню", callback_data="back_to_menu")]
+                    ])
+                )
+                
+        except Exception as e:
+            logger.error(f"❌ Ошибка в callback {data}: {e}", exc_info=True)
+            try:
+                await query.edit_message_text(
+                    f"❌ *{user_name}, произошла ошибка*\n\nПопробуйте еще раз или вернитесь в меню.",
+                    parse_mode=ParseMode.MARKDOWN,
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("📋 В меню", callback_data="back_to_menu")]
+                    ])
+                )
+            except:
+                pass
     
     async def show_categories(self, query, user_id: int, user_name: str):
         """Показ категорий сохраненных рецептов"""
+        logger.info(f"📂 Получаем категории для пользователя {user_id}")
         categories = self.storage.get_user_categories(user_id)
+        logger.info(f"📂 Найдено категорий: {len(categories)}")
         
         if not categories:
             await query.edit_message_text(
@@ -169,12 +207,10 @@ class RecipeBot:
         
         keyboard = []
         for cat in categories:
-            keyboard.append([
-                InlineKeyboardButton(
-                    f"{cat['name']} ({cat['count']})",
-                    callback_data=f"cat_{cat['key']}"
-                )
-            ])
+            callback_data = f"cat_{cat['key']}"
+            button_text = f"{cat['name']} ({cat['count']})"
+            keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
+            logger.info(f"  → Добавлена кнопка: {button_text} -> {callback_data}")
         
         keyboard.append([InlineKeyboardButton("◀️ Назад в меню", callback_data="back_to_menu")])
         
@@ -187,8 +223,10 @@ class RecipeBot:
     
     async def show_recipes_in_category(self, query, user_id: int, user_name: str, category: str):
         """Показ рецептов в категории"""
+        logger.info(f"📖 Получаем рецепты в категории '{category}' для пользователя {user_id}")
         recipes = self.storage.get_recipes_in_category(user_id, category)
         category_name = self.storage.get_category_name(category)
+        logger.info(f"📖 Найдено рецептов: {len(recipes)}")
         
         if not recipes:
             await query.edit_message_text(
@@ -200,12 +238,11 @@ class RecipeBot:
             )
             return
         
-        # Группируем рецепты для отображения
         text = f"*{category_name}*\n\n"
         keyboard = []
         
         for i, recipe in enumerate(recipes[:15]):
-            title = recipe['title'][:30]
+            title = recipe['title'][:40]
             calories = recipe.get('calories', 0)
             cook_time = recipe.get('cook_time', 0)
             
@@ -214,34 +251,26 @@ class RecipeBot:
             
             # Кнопка для просмотра рецепта
             callback_data = f"view_{category}_{recipe['filename']}"
-            keyboard.append([
-                InlineKeyboardButton(f"📖 {title}", callback_data=callback_data)
-            ])
+            keyboard.append([InlineKeyboardButton(f"📖 {title[:30]}", callback_data=callback_data)])
         
         if len(recipes) > 15:
             text += f"\n_... и еще {len(recipes) - 15} рецептов_"
         
         keyboard.append([InlineKeyboardButton("◀️ Назад к категориям", callback_data="back_to_categories")])
         
-        try:
-            await query.edit_message_text(
-                text,
-                parse_mode=ParseMode.MARKDOWN,
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-        except Exception as e:
-            logger.error(f"Error showing recipes: {e}")
-            await query.edit_message_text(
-                f"*{category_name}*\n\nВыберите рецепт:",
-                parse_mode=ParseMode.MARKDOWN,
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
+        await query.edit_message_text(
+            text,
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
     
     async def show_recipe(self, query, user_id: int, user_name: str, category: str, filename: str):
         """Показ полного рецепта"""
+        logger.info(f"👁 Просмотр рецепта: {category}/{filename}")
         recipe = self.storage.get_recipe(user_id, category, filename)
         
         if not recipe:
+            logger.error(f"❌ Рецепт не найден: {category}/{filename}")
             await query.edit_message_text(
                 "❌ Рецепт не найден",
                 reply_markup=InlineKeyboardMarkup([
@@ -260,22 +289,20 @@ class RecipeBot:
             [InlineKeyboardButton("📋 В главное меню", callback_data="back_to_menu")]
         ]
         
-        try:
-            await query.edit_message_text(
-                formatted,
-                parse_mode=ParseMode.MARKDOWN,
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-        except Exception as e:
-            logger.error(f"Error showing recipe: {e}")
-            await query.edit_message_text(
-                formatted[:4000],
-                parse_mode=ParseMode.MARKDOWN,
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
+        # Обрезаем если слишком длинное
+        if len(formatted) > 4000:
+            formatted = formatted[:4000] + "\n\n_(текст обрезан)_"
+        
+        await query.edit_message_text(
+            formatted,
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
     
     async def delete_recipe_callback(self, query, user_id: int, user_name: str, category: str, filename: str):
         """Удаление рецепта"""
+        logger.info(f"🗑 Удаление рецепта: {category}/{filename}")
+        
         if self.storage.delete_recipe(user_id, category, filename):
             await query.edit_message_text(
                 f"✅ *{user_name}, рецепт удален*",
@@ -315,7 +342,10 @@ class RecipeBot:
     
     async def save_recipe_callback(self, query, user_id: int, user_name: str, recipe_id: str):
         """Сохранение рецепта"""
+        logger.info(f"💾 Сохранение рецепта {recipe_id} для пользователя {user_id}")
+        
         if user_id not in self.temp_recipes:
+            logger.error(f"❌ Рецепт {recipe_id} не найден во временном хранилище")
             await query.edit_message_text(f"❌ {user_name}, рецепт не найден")
             return
         
@@ -325,6 +355,8 @@ class RecipeBot:
         category = recipe.get('meal_type', 'другое').lower()
         category_key = self.storage.meal_type_to_category.get(category, 'other')
         category_name = self.storage.get_category_name(category_key)
+        
+        logger.info(f"✅ Рецепт сохранен в {filepath}")
         
         await query.edit_message_text(
             f"✅ *{user_name}, рецепт сохранен!*\n\n"
@@ -349,13 +381,19 @@ class RecipeBot:
             await update.message.reply_text(f"❌ {user_name}, это некорректная ссылка")
             return
         
-        status_message = await update.message.reply_text(f"🔍 *{user_name}, бот читает страницу...*", parse_mode=ParseMode.MARKDOWN)
+        status_message = await update.message.reply_text(
+            f"🔍 *{user_name}, бот читает страницу...*",
+            parse_mode=ParseMode.MARKDOWN
+        )
         
         try:
             # Парсинг
             raw_text = await self.parser.parse_recipe(url)
             
-            await status_message.edit_text(f"🤖 *{user_name}, анализирую рецепт и считаю КБЖУ...*", parse_mode=ParseMode.MARKDOWN)
+            await status_message.edit_text(
+                f"🤖 *{user_name}, анализирую рецепт и считаю КБЖУ...*",
+                parse_mode=ParseMode.MARKDOWN
+            )
             
             # Нормализация
             recipe = await self.normalizer.normalize(raw_text)
@@ -371,7 +409,7 @@ class RecipeBot:
             # Удаляем статус
             await status_message.delete()
             
-            # Отправляем результат с кнопками сохранения под сообщением
+            # Отправляем результат
             await update.message.reply_text(
                 formatted_text,
                 parse_mode=ParseMode.MARKDOWN,
