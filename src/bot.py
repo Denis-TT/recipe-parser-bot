@@ -139,7 +139,6 @@ class RecipeBot:
         keyboard = []
         for i, recipe in enumerate(recipes[:15]):
             title = recipe['title'][:40]
-            codex/audit-code-and-fix-saved-recipes-feature-nmkd76
             escaped_title = escape_markdown(title, version=1)
             text += f"{i+1}. *{escaped_title}*\n   🔥 {recipe.get('calories', 0)} ккал | ⏱ {recipe.get('cook_time', 0)} мин\n\n"
             keyboard.append([InlineKeyboardButton(f"📖 {title[:30]}", callback_data=f"view_{category}_{recipe['recipe_uid']}")])
