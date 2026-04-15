@@ -488,7 +488,7 @@ class RecipeBot:
         
         if not validate_url(url):
             await update.message.reply_text(
-                f"❌ *Это некорректная ссылка*",
+                "❌ *Это некорректная ссылка*",
                 reply_markup=self.get_main_keyboard()
             )
             return
