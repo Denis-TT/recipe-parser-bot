@@ -50,19 +50,20 @@ class GitHubModelNormalizer:
 }
 
 ВАЖНО: 
+- nutrition_per_serving - КБЖУ на ОДНУ порцию
+- nutrition - КБЖУ на 100 грамм готового блюда
 - ВСЕ числа должны быть рассчитаны на основе ингредиентов
 - НЕ ИСПОЛЬЗУЙ шаблонные значения
-- Если не можешь определить - сделай ОБОСНОВАННУЮ оценку"""
+- Проверь, что КБЖУ на 100г МЕНЬШЕ чем на порцию (если порция больше 100г)
+- Если порция 300г, то КБЖУ на 100г = КБЖУ на порцию / 3"""
     
     async def normalize(self, raw_text: str) -> Dict[str, Any]:
         if not raw_text:
             logger.error("Пустой текст для нормализации")
             return self._get_error_recipe("Пустой текст")
         
-        # Ограничиваем длину
         if len(raw_text) > 30000:
             raw_text = raw_text[:30000]
-            logger.info(f"Текст обрезан до 30000 символов")
         
         headers = {
             "Content-Type": "application/json",
@@ -76,12 +77,10 @@ class GitHubModelNormalizer:
                 {"role": "user", "content": f"Проанализируй этот рецепт и верни JSON с реальными данными:\n\n{raw_text}"}
             ],
             "temperature": 0.3,
-            "max_tokens": 2000
+            "max_tokens": 2500
         }
         
         try:
-            logger.info(f"Отправка запроса к GitHub Models API...")
-            
             async with aiohttp.ClientSession() as session:
                 async with session.post(
                     self.api_url,
@@ -90,21 +89,13 @@ class GitHubModelNormalizer:
                     timeout=aiohttp.ClientTimeout(total=60)
                 ) as response:
                     
-                    logger.info(f"Статус ответа: {response.status}")
-                    
                     if response.status != 200:
                         error_text = await response.text()
-                        logger.error(f"GitHub API error {response.status}: {error_text[:300]}")
+                        logger.error(f"GitHub API error {response.status}")
                         return self._get_error_recipe(f"API Error {response.status}")
                     
                     data = await response.json()
-                    
-                    if "choices" not in data or not data["choices"]:
-                        logger.error(f"Нет choices в ответе: {data}")
-                        return self._get_error_recipe("Нет ответа от модели")
-                    
                     content = data["choices"][0]["message"]["content"]
-                    logger.info(f"Получен ответ длиной {len(content)} символов")
                     
                     # Очищаем от markdown
                     content = content.strip()
@@ -116,36 +107,34 @@ class GitHubModelNormalizer:
                         content = content[:-3]
                     content = content.strip()
                     
-                    try:
-                        result = json.loads(content)
-                        logger.info(f"✅ JSON успешно распарсен")
-                        logger.info(f"Название: {result.get('title', 'Н/Д')}")
-                        logger.info(f"Тип: {result.get('meal_type', 'Н/Д')}")
-                        
-                        # Проверяем, не дефолтные ли значения
-                        nutrition = result.get('nutrition_per_serving', {})
-                        if nutrition.get('calories') == 400 and nutrition.get('protein') == 20:
-                            logger.warning("⚠️ Обнаружены дефолтные значения КБЖУ")
-                        
-                        return result
-                        
-                    except json.JSONDecodeError as e:
-                        logger.error(f"JSON decode error: {e}")
-                        logger.error(f"Content: {content[:500]}")
-                        return self._get_error_recipe("Ошибка парсинга JSON")
-                        
-        except aiohttp.ClientError as e:
-            logger.error(f"Ошибка подключения: {e}")
-            return self._get_error_recipe("Ошибка подключения к API")
+                    result = json.loads(content)
+                    
+                    # Проверяем и исправляем КБЖУ на 100г если оно неправильное
+                    serving = result.get('servings', 1)
+                    nutrition_per_serving = result.get('nutrition_per_serving', {})
+                    nutrition_100 = result.get('nutrition', {})
+                    
+                    # Если КБЖУ на 100г больше чем на порцию - это ошибка
+                    if nutrition_100.get('calories', 0) > nutrition_per_serving.get('calories', 0):
+                        logger.warning("⚠️ КБЖУ на 100г больше чем на порцию - исправляю")
+                        # Примерный вес порции (возьмем 300г как среднее)
+                        portion_weight = 300
+                        for key in ['calories', 'protein', 'fat', 'carbs']:
+                            if key in nutrition_per_serving:
+                                nutrition_100[key] = round(nutrition_per_serving[key] * 100 / portion_weight)
+                        result['nutrition'] = nutrition_100
+                    
+                    logger.info(f"✅ Рецепт обработан: {result.get('title')}")
+                    return result
+                    
         except Exception as e:
-            logger.error(f"Неизвестная ошибка: {e}")
+            logger.error(f"Ошибка: {e}")
             return self._get_error_recipe(str(e)[:100])
     
     def _get_error_recipe(self, error: str) -> Dict[str, Any]:
-        """Создает рецепт с информацией об ошибке"""
         return {
             "title": f"Ошибка обработки",
-            "description": f"Не удалось обработать рецепт: {error}",
+            "description": f"Не удалось обработать: {error}",
             "cuisine": "",
             "meal_type": "основное блюдо",
             "difficulty": "",

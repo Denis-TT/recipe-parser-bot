@@ -87,7 +87,7 @@ def format_recipe_for_telegram(recipe: Dict[str, Any]) -> str:
     ingredients = recipe.get('ingredients', [])
     if ingredients:
         text += "*🛒 Ингредиенты:*\n"
-        for ing in ingredients[:20]:
+        for ing in ingredients:
             if isinstance(ing, dict):
                 parts = []
                 if ing.get('amount'):
@@ -103,16 +103,13 @@ def format_recipe_for_telegram(recipe: Dict[str, Any]) -> str:
                     text += f"• {ing_text}\n"
             elif isinstance(ing, str):
                 text += f"• {ing}\n"
-        
-        if len(ingredients) > 20:
-            text += f"• ... и еще {len(ingredients) - 20}\n"
         text += "\n"
     
-    # Шаги
+    # Шаги приготовления - показываем ВСЕ шаги
     steps = recipe.get('steps', [])
     if steps:
         text += "*📝 Приготовление:*\n"
-        for step in steps[:8]:
+        for step in steps:
             if isinstance(step, dict):
                 num = step.get('step_number', '•')
                 desc = step.get('description', '')
@@ -122,31 +119,37 @@ def format_recipe_for_telegram(recipe: Dict[str, Any]) -> str:
                 text += step_text + "\n"
             elif isinstance(step, str):
                 text += f"• {step}\n"
-        
-        if len(steps) > 8:
-            text += f"... и еще {len(steps) - 8} шагов\n"
         text += "\n"
     
     # Советы и хранение
     tips = recipe.get('tips', [])
     if tips:
         text += "*💡 Советы:*\n"
-        for tip in tips[:3]:
+        for tip in tips:
             text += f"• {tip}\n"
     
     if recipe.get('storage'):
         text += f"\n*📦 Хранение:* {recipe['storage']}\n"
     
-    # Теги
-    tags = recipe.get('tags', [])
-    if tags:
-        text += "\n"
-        for tag in tags[:5]:
-            text += f"#{tag.replace(' ', '_')} "
-    
-    # Обрезаем для Telegram
+    # Обрезаем для Telegram (лимит 4096 символов)
     if len(text) > 4000:
-        text = text[:4000] + "...\n\n(полная версия в JSON файле)"
+        # Считаем, сколько примерно шагов помещается
+        lines = text.split('\n')
+        new_text = []
+        current_length = 0
+        
+        for line in lines:
+            if current_length + len(line) + 1 < 3900:
+                new_text.append(line)
+                current_length += len(line) + 1
+            else:
+                break
+        
+        remaining_steps = len(steps) - sum(1 for line in new_text if line and line[0].isdigit())
+        if remaining_steps > 0:
+            new_text.append(f"\n_... и еще {remaining_steps} шагов (полный рецепт сохранен локально)_")
+        
+        text = '\n'.join(new_text)
     
     return text
 
