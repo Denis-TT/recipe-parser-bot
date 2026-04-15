@@ -1,6 +1,9 @@
 import json
 import aiohttp
-from typing import Dict, Any, Optional
+import logging
+from typing import Dict, Any
+
+logger = logging.getLogger(__name__)
 
 class GitHubModelNormalizer:
     def __init__(self, github_token: str, model: str = "gpt-4o-mini"):
@@ -8,75 +11,58 @@ class GitHubModelNormalizer:
         self.model = model
         self.api_url = "https://models.inference.ai.azure.com/chat/completions"
         
-        self.system_prompt = """Ты профессиональный диетолог и шеф-повар. Извлеки из текста рецепт и рассчитай КБЖУ.
+        self.system_prompt = """Ты профессиональный диетолог и шеф-повар. Проанализируй текст и извлеки рецепт.
 
-Верни ТОЛЬКО JSON в формате:
+Верни ТОЛЬКО JSON в таком формате:
 {
     "title": "Название блюда",
     "description": "Краткое описание",
     "cuisine": "Кухня мира",
-    "meal_type": "завтрак/обед/ужин/десерт/перекус/закуска/напиток",
+    "meal_type": "завтрак/обед/ужин/десерт/закуска/напиток",
     "difficulty": "легко/средне/сложно",
-    "prep_time": "Время подготовки в минутах (число)",
-    "cook_time": "Время приготовления в минутах (число)",
-    "total_time": "Общее время в минутах (число)",
-    "servings": "Количество порций (число)",
+    "prep_time": 20,
+    "cook_time": 30,
+    "total_time": 50,
+    "servings": 4,
     "ingredients": [
-        {
-            "name": "Название ингредиента",
-            "amount": "Количество (число)",
-            "unit": "Единица измерения (г, мл, шт, ст.л., ч.л.)",
-            "notes": "Примечания"
-        }
+        {"name": "название", "amount": 1, "unit": "г/мл/шт", "notes": ""}
     ],
     "steps": [
-        {
-            "step_number": 1,
-            "description": "Описание шага",
-            "time": "Время шага в минутах (опционально)"
-        }
+        {"step_number": 1, "description": "описание шага"}
     ],
-    "nutrition": {
-        "calories": "Калории на 100г (число)",
-        "protein": "Белки на 100г в граммах (число)",
-        "fat": "Жиры на 100г в граммах (число)",
-        "carbs": "Углеводы на 100г в граммах (число)",
-        "fiber": "Клетчатка на 100г в граммах (число)"
-    },
     "nutrition_per_serving": {
-        "calories": "Калории на порцию (число)",
-        "protein": "Белки на порцию (число)",
-        "fat": "Жиры на порцию (число)",
-        "carbs": "Углеводы на порцию (число)"
+        "calories": 0,
+        "protein": 0,
+        "fat": 0,
+        "carbs": 0
     },
-    "total_nutrition": {
-        "calories": "Общие калории на всё блюдо (число)",
-        "protein": "Общие белки (число)",
-        "fat": "Общие жиры (число)",
-        "carbs": "Общие углеводы (число)"
+    "nutrition": {
+        "calories": 0,
+        "protein": 0,
+        "fat": 0,
+        "carbs": 0
     },
-    "equipment": ["Необходимое оборудование"],
-    "tips": ["Советы по приготовлению"],
+    "tips": [],
     "storage": "Как хранить",
-    "tags": ["ключевые", "слова"],
-    "is_vegetarian": true/false,
-    "is_vegan": true/false,
-    "is_gluten_free": true/false,
-    "is_lactose_free": true/false
+    "is_vegetarian": false,
+    "is_vegan": false,
+    "is_gluten_free": false
 }
 
-ВАЖНО:
-1. meal_type определи по ингредиентам и контексту
-2. nutrition рассчитай примерно, основываясь на ингредиентах
-3. Если точных данных нет, сделай обоснованную оценку
-4. Все числа в nutrition должны быть числами, не строками"""
+ВАЖНО: 
+- ВСЕ числа должны быть рассчитаны на основе ингредиентов
+- НЕ ИСПОЛЬЗУЙ шаблонные значения
+- Если не можешь определить - сделай ОБОСНОВАННУЮ оценку"""
     
     async def normalize(self, raw_text: str) -> Dict[str, Any]:
         if not raw_text:
-            return self._get_empty_recipe()
+            logger.error("Пустой текст для нормализации")
+            return self._get_error_recipe("Пустой текст")
         
+        # Ограничиваем длину
         if len(raw_text) > 30000:
             raw_text = raw_text[:30000]
+            logger.info(f"Текст обрезан до 30000 символов")
         
         headers = {
             "Content-Type": "application/json",
@@ -87,13 +73,15 @@ class GitHubModelNormalizer:
             "model": self.model,
             "messages": [
                 {"role": "system", "content": self.system_prompt},
-                {"role": "user", "content": f"Проанализируй рецепт, определи тип блюда и рассчитай КБЖУ:\n\n{raw_text}"}
+                {"role": "user", "content": f"Проанализируй этот рецепт и верни JSON с реальными данными:\n\n{raw_text}"}
             ],
             "temperature": 0.3,
-            "max_tokens": 3000
+            "max_tokens": 2000
         }
         
         try:
+            logger.info(f"Отправка запроса к GitHub Models API...")
+            
             async with aiohttp.ClientSession() as session:
                 async with session.post(
                     self.api_url,
@@ -102,15 +90,23 @@ class GitHubModelNormalizer:
                     timeout=aiohttp.ClientTimeout(total=60)
                 ) as response:
                     
+                    logger.info(f"Статус ответа: {response.status}")
+                    
                     if response.status != 200:
                         error_text = await response.text()
-                        print(f"❌ GitHub API error {response.status}: {error_text[:200]}")
-                        return self._get_empty_recipe()
+                        logger.error(f"GitHub API error {response.status}: {error_text[:300]}")
+                        return self._get_error_recipe(f"API Error {response.status}")
                     
                     data = await response.json()
-                    content = data["choices"][0]["message"]["content"]
                     
-                    # Извлекаем JSON
+                    if "choices" not in data or not data["choices"]:
+                        logger.error(f"Нет choices в ответе: {data}")
+                        return self._get_error_recipe("Нет ответа от модели")
+                    
+                    content = data["choices"][0]["message"]["content"]
+                    logger.info(f"Получен ответ длиной {len(content)} символов")
+                    
+                    # Очищаем от markdown
                     content = content.strip()
                     if content.startswith("```json"):
                         content = content[7:]
@@ -118,89 +114,53 @@ class GitHubModelNormalizer:
                         content = content[3:]
                     if content.endswith("```"):
                         content = content[:-3]
+                    content = content.strip()
                     
-                    result = json.loads(content.strip())
-                    
-                    # Валидация и установка значений по умолчанию
-                    result = self._validate_recipe(result)
-                    
-                    print(f"✅ Рецепт нормализован: {result.get('title')} | Тип: {result.get('meal_type')} | Ккал: {result.get('nutrition', {}).get('calories')}")
-                    
-                    return result
-                    
+                    try:
+                        result = json.loads(content)
+                        logger.info(f"✅ JSON успешно распарсен")
+                        logger.info(f"Название: {result.get('title', 'Н/Д')}")
+                        logger.info(f"Тип: {result.get('meal_type', 'Н/Д')}")
+                        
+                        # Проверяем, не дефолтные ли значения
+                        nutrition = result.get('nutrition_per_serving', {})
+                        if nutrition.get('calories') == 400 and nutrition.get('protein') == 20:
+                            logger.warning("⚠️ Обнаружены дефолтные значения КБЖУ")
+                        
+                        return result
+                        
+                    except json.JSONDecodeError as e:
+                        logger.error(f"JSON decode error: {e}")
+                        logger.error(f"Content: {content[:500]}")
+                        return self._get_error_recipe("Ошибка парсинга JSON")
+                        
+        except aiohttp.ClientError as e:
+            logger.error(f"Ошибка подключения: {e}")
+            return self._get_error_recipe("Ошибка подключения к API")
         except Exception as e:
-            print(f"❌ Ошибка: {e}")
-            return self._get_empty_recipe()
+            logger.error(f"Неизвестная ошибка: {e}")
+            return self._get_error_recipe(str(e)[:100])
     
-    def _validate_recipe(self, recipe: Dict) -> Dict:
-        """Валидация и установка значений по умолчанию"""
-        
-        # Обязательные поля
-        defaults = {
-            "title": "Блюдо",
-            "description": "",
-            "cuisine": "интернациональная",
+    def _get_error_recipe(self, error: str) -> Dict[str, Any]:
+        """Создает рецепт с информацией об ошибке"""
+        return {
+            "title": f"Ошибка обработки",
+            "description": f"Не удалось обработать рецепт: {error}",
+            "cuisine": "",
             "meal_type": "основное блюдо",
-            "difficulty": "средне",
-            "prep_time": 20,
-            "cook_time": 30,
-            "total_time": 50,
-            "servings": 4,
+            "difficulty": "",
+            "prep_time": 0,
+            "cook_time": 0,
+            "total_time": 0,
+            "servings": 1,
             "ingredients": [],
             "steps": [],
-            "nutrition": {
-                "calories": 200,
-                "protein": 10,
-                "fat": 10,
-                "carbs": 20,
-                "fiber": 2
-            },
-            "nutrition_per_serving": {
-                "calories": 400,
-                "protein": 20,
-                "fat": 20,
-                "carbs": 40
-            },
-            "total_nutrition": {
-                "calories": 1600,
-                "protein": 80,
-                "fat": 80,
-                "carbs": 160
-            },
-            "equipment": [],
-            "tips": [],
-            "storage": "В холодильнике до 3 дней",
-            "tags": [],
+            "nutrition_per_serving": {"calories": 0, "protein": 0, "fat": 0, "carbs": 0},
+            "nutrition": {"calories": 0, "protein": 0, "fat": 0, "carbs": 0},
+            "tips": ["Попробуйте другую ссылку"],
+            "storage": "",
             "is_vegetarian": False,
             "is_vegan": False,
             "is_gluten_free": False,
-            "is_lactose_free": False
+            "error": error
         }
-        
-        # Рекурсивно устанавливаем значения по умолчанию
-        for key, default_value in defaults.items():
-            if key not in recipe or recipe[key] is None:
-                recipe[key] = default_value
-            elif isinstance(default_value, dict):
-                for sub_key, sub_default in default_value.items():
-                    if sub_key not in recipe[key] or recipe[key][sub_key] is None:
-                        recipe[key][sub_key] = sub_default
-        
-        # Определяем meal_type если не указан
-        if recipe["meal_type"] == "основное блюдо":
-            title_lower = recipe["title"].lower()
-            if any(word in title_lower for word in ["завтрак", "утро", "яич", "каша", "омлет", "тост"]):
-                recipe["meal_type"] = "завтрак"
-            elif any(word in title_lower for word in ["суп", "борщ", "щи", "солянка"]):
-                recipe["meal_type"] = "обед"
-            elif any(word in title_lower for word in ["десерт", "торт", "пирог", "слад", "шоколад"]):
-                recipe["meal_type"] = "десерт"
-            elif any(word in title_lower for word in ["салат", "закуска"]):
-                recipe["meal_type"] = "закуска"
-            elif any(word in title_lower for word in ["напиток", "сок", "коктейль", "чай", "кофе"]):
-                recipe["meal_type"] = "напиток"
-        
-        return recipe
-    
-    def _get_empty_recipe(self) -> Dict[str, Any]:
-        return self._validate_recipe({})
