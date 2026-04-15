@@ -3,7 +3,7 @@ import logging
 from typing import Optional, Dict, Any
 from datetime import datetime
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from telegram.constants import ParseMode
 
@@ -36,12 +36,16 @@ class RecipeBot:
         else:
             return "Пользователь"
     
-    def get_main_keyboard(self) -> ReplyKeyboardMarkup:
-        """Создание клавиатуры с кнопкой Меню"""
-        keyboard = [
-            [KeyboardButton("📋 Меню")],
+    async def setup_commands(self, application: Application):
+        """Настройка меню команд бота"""
+        commands = [
+            BotCommand("start", "🚀 Начать работу"),
+            BotCommand("menu", "📋 Главное меню"),
+            BotCommand("saved", "📚 Сохраненные рецепты"),
+            BotCommand("help", "ℹ️ Помощь"),
         ]
-        return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        await application.bot.set_my_commands(commands)
+        logger.info("✅ Меню команд настроено")
     
     def get_menu_keyboard(self) -> InlineKeyboardMarkup:
         """Создание инлайн меню"""
@@ -72,23 +76,77 @@ class RecipeBot:
             "• Извлекать рецепты с любых сайтов\n"
             "• Определять тип блюда и КБЖУ\n"
             "• Сохранять рецепты в избранное\n\n"
-            "Отправь мне ссылку на рецепт или нажми *📋 Меню*!"
+            "Отправь мне ссылку на рецепт или используй *Меню* (кнопка слева от поля ввода)!"
         )
         
         await update.message.reply_text(
             welcome_text,
-            parse_mode=ParseMode.MARKDOWN,
-            reply_markup=self.get_main_keyboard()
+            parse_mode=ParseMode.MARKDOWN
         )
     
-    async def handle_menu_button(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработчик кнопки Меню"""
+    async def menu_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Обработчик /menu"""
         user_name = self.get_user_name(update)
         
         await update.message.reply_text(
             f"📋 *{user_name}, главное меню*\n\nВыберите действие:",
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=self.get_menu_keyboard()
+        )
+    
+    async def saved_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Обработчик /saved - прямой доступ к сохраненным рецептам"""
+        user_id = update.effective_user.id
+        user_name = self.get_user_name(update)
+        
+        categories = self.storage.get_user_categories(user_id)
+        
+        if not categories:
+            await update.message.reply_text(
+                f"📭 *{user_name}, у вас пока нет сохраненных рецептов*\n\n"
+                "Отправьте ссылку на рецепт и нажмите 'Да' чтобы сохранить!",
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("◀️ В меню", callback_data="back_to_menu")]
+                ])
+            )
+            return
+        
+        keyboard = []
+        for cat in categories:
+            callback_data = f"cat_{cat['key']}"
+            button_text = f"{cat['name']} ({cat['count']})"
+            keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
+        
+        keyboard.append([InlineKeyboardButton("◀️ В меню", callback_data="back_to_menu")])
+        
+        await update.message.reply_text(
+            f"📚 *{user_name}, ваши сохраненные рецепты*\n\n"
+            "Выберите категорию:",
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    
+    async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Обработчик /help"""
+        user_name = self.get_user_name(update)
+        
+        help_text = (
+            f"📚 *{user_name}, как пользоваться ботом:*\n\n"
+            "1️⃣ Отправьте ссылку на рецепт\n"
+            "2️⃣ Бот обработает и покажет результат\n"
+            "3️⃣ Нажмите '✅ Да' чтобы сохранить рецепт\n\n"
+            "*Доступные команды:*\n"
+            "/start - Начать работу\n"
+            "/menu - Главное меню\n"
+            "/saved - Сохраненные рецепты\n"
+            "/help - Помощь\n\n"
+            "Или используйте кнопку *Меню* слева от поля ввода!"
+        )
+        
+        await update.message.reply_text(
+            help_text,
+            parse_mode=ParseMode.MARKDOWN
         )
     
     async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -169,7 +227,7 @@ class RecipeBot:
             else:
                 logger.warning(f"⚠️ Неизвестный callback: {data}")
                 await query.edit_message_text(
-                    f"❌ Неизвестная команда: {data}",
+                    f"❌ Неизвестная команда",
                     reply_markup=InlineKeyboardMarkup([
                         [InlineKeyboardButton("📋 В меню", callback_data="back_to_menu")]
                     ])
@@ -179,7 +237,7 @@ class RecipeBot:
             logger.error(f"❌ Ошибка в callback {data}: {e}", exc_info=True)
             try:
                 await query.edit_message_text(
-                    f"❌ *{user_name}, произошла ошибка*\n\nПопробуйте еще раз или вернитесь в меню.",
+                    f"❌ *{user_name}, произошла ошибка*\n\nПопробуйте еще раз.",
                     parse_mode=ParseMode.MARKDOWN,
                     reply_markup=InlineKeyboardMarkup([
                         [InlineKeyboardButton("📋 В меню", callback_data="back_to_menu")]
@@ -200,7 +258,7 @@ class RecipeBot:
                 "Отправьте ссылку на рецепт и нажмите 'Да' чтобы сохранить!",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("◀️ Назад в меню", callback_data="back_to_menu")]
+                    [InlineKeyboardButton("◀️ В меню", callback_data="back_to_menu")]
                 ])
             )
             return
@@ -212,7 +270,7 @@ class RecipeBot:
             keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
             logger.info(f"  → Добавлена кнопка: {button_text} -> {callback_data}")
         
-        keyboard.append([InlineKeyboardButton("◀️ Назад в меню", callback_data="back_to_menu")])
+        keyboard.append([InlineKeyboardButton("◀️ В меню", callback_data="back_to_menu")])
         
         await query.edit_message_text(
             f"📚 *{user_name}, ваши сохраненные рецепты*\n\n"
@@ -249,7 +307,6 @@ class RecipeBot:
             text += f"{i+1}. *{title}*\n"
             text += f"   🔥 {calories} ккал | ⏱ {cook_time} мин\n\n"
             
-            # Кнопка для просмотра рецепта
             callback_data = f"view_{category}_{recipe['filename']}"
             keyboard.append([InlineKeyboardButton(f"📖 {title[:30]}", callback_data=callback_data)])
         
@@ -289,7 +346,6 @@ class RecipeBot:
             [InlineKeyboardButton("📋 В главное меню", callback_data="back_to_menu")]
         ]
         
-        # Обрезаем если слишком длинное
         if len(formatted) > 4000:
             formatted = formatted[:4000] + "\n\n_(текст обрезан)_"
         
@@ -320,23 +376,21 @@ class RecipeBot:
             )
     
     async def show_help(self, query, user_name: str):
-        """Показ помощи"""
+        """Показ помощи через инлайн"""
         help_text = (
-            f"📚 *{user_name}, как пользоваться ботом:*\n\n"
-            "1️⃣ Отправьте ссылку на рецепт\n"
-            "2️⃣ Бот обработает и покажет результат\n"
-            "3️⃣ Нажмите '✅ Да' чтобы сохранить рецепт\n"
-            "4️⃣ Смотрите сохраненные рецепты через *📋 Меню*\n\n"
-            "*Кнопки:*\n"
-            "📋 Меню - открыть главное меню\n"
-            "📚 Сохраненные рецепты - просмотр избранного"
+            f"📚 *{user_name}, доступные команды:*\n\n"
+            "/start - 🚀 Начать работу\n"
+            "/menu - 📋 Главное меню\n"
+            "/saved - 📚 Сохраненные рецепты\n"
+            "/help - ℹ️ Помощь\n\n"
+            "Или используйте кнопку *Меню* слева от поля ввода!"
         )
         
         await query.edit_message_text(
             help_text,
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("◀️ Назад в меню", callback_data="back_to_menu")]
+                [InlineKeyboardButton("◀️ В меню", callback_data="back_to_menu")]
             ])
         )
     
@@ -361,11 +415,12 @@ class RecipeBot:
         await query.edit_message_text(
             f"✅ *{user_name}, рецепт сохранен!*\n\n"
             f"📁 Категория: {category_name}\n"
-            f"📄 {recipe.get('title', 'Блюдо')}",
+            f"📄 {recipe.get('title', 'Блюдо')}\n\n"
+            f"Используйте /saved чтобы посмотреть сохраненные рецепты!",
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("📚 Смотреть сохраненные", callback_data="menu_saved")],
-                [InlineKeyboardButton("📋 В главное меню", callback_data="back_to_menu")]
+                [InlineKeyboardButton("📋 В меню", callback_data="back_to_menu")]
             ])
         )
         
@@ -432,16 +487,19 @@ class RecipeBot:
                 parse_mode=ParseMode.MARKDOWN
             )
     
+    async def post_init(self, application: Application):
+        """Вызывается после инициализации приложения"""
+        await self.setup_commands(application)
+    
     def run(self):
         """Запуск бота"""
-        app = Application.builder().token(self.telegram_token).build()
+        app = Application.builder().token(self.telegram_token).post_init(self.post_init).build()
         
         # Обработчики команд
         app.add_handler(CommandHandler("start", self.start_command))
-        app.add_handler(CommandHandler("menu", self.handle_menu_button))
-        
-        # Обработчик кнопки Меню
-        app.add_handler(MessageHandler(filters.Regex("^📋 Меню$"), self.handle_menu_button))
+        app.add_handler(CommandHandler("menu", self.menu_command))
+        app.add_handler(CommandHandler("saved", self.saved_command))
+        app.add_handler(CommandHandler("help", self.help_command))
         
         # Обработчик URL
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_url))
@@ -449,7 +507,7 @@ class RecipeBot:
         # Обработчик инлайн кнопок
         app.add_handler(CallbackQueryHandler(self.handle_callback))
         
-        logger.info("🚀 Бот запущен с меню и историей!")
+        logger.info("🚀 Бот запущен с командным меню!")
         app.run_polling(drop_pending_updates=True)
     
     async def cleanup(self):
