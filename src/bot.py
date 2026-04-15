@@ -139,11 +139,18 @@ class RecipeBot:
         keyboard = []
         for i, recipe in enumerate(recipes[:15]):
             title = recipe['title'][:40]
+            codex/audit-code-and-fix-saved-recipes-feature-nmkd76
             escaped_title = escape_markdown(title, version=1)
             text += f"{i+1}. *{escaped_title}*\n   🔥 {recipe.get('calories', 0)} ккал | ⏱ {recipe.get('cook_time', 0)} мин\n\n"
             keyboard.append([InlineKeyboardButton(f"📖 {title[:30]}", callback_data=f"view_{category}_{recipe['recipe_uid']}")])
         keyboard.append([InlineKeyboardButton("◀️ Назад к категориям", callback_data="back_to_categories")])
         await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup(keyboard))
+            escaped_title = escape_markdown(title, version=2)
+            text += f"{i+1}. *{escaped_title}*\n   🔥 {recipe.get('calories', 0)} ккал | ⏱ {recipe.get('cook_time', 0)} мин\n\n"
+            keyboard.append([InlineKeyboardButton(f"📖 {title[:30]}", callback_data=f"view_{category}_{recipe['recipe_uid']}")])
+        keyboard.append([InlineKeyboardButton("◀️ Назад к категориям", callback_data="back_to_categories")])
+        await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=InlineKeyboardMarkup(keyboard))
+main+history
 
     async def show_recipe(self, query, user_id: int, category: str, recipe_uid: str):
         recipe = self.storage.get_recipe_by_uid(user_id, category, recipe_uid)
