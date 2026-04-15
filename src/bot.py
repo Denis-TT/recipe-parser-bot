@@ -78,7 +78,9 @@ class RecipeBot:
         user_name = self.get_user_name(update)
         
         welcome_text = (
-            f"👨‍🍳 *Привет, {user_name}!*\n\n"
+            f"👨‍🍳 *Привет, шеф-повар!*
+
+"
             "Я бот для парсинга и сохранения рецептов.\n\n"
             "*Что я умею:*\n"
             "• Извлекать рецепты с любых сайтов\n"
@@ -98,7 +100,9 @@ class RecipeBot:
         user_name = self.get_user_name(update)
         
         await update.message.reply_text(
-            f"📋 *{user_name}, главное меню*\n\n"
+            f"📋 *Главное меню*
+
+"
             "Выберите действие на клавиатуре:",
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=self.get_main_keyboard()
@@ -113,7 +117,9 @@ class RecipeBot:
         user_name = self.get_user_name(update)
         
         help_text = (
-            f"📚 *{user_name}, как пользоваться ботом:*\n\n"
+            f"📚 *Как пользоваться ботом:*
+
+"
             "1️⃣ Отправьте ссылку на рецепт\n"
             "2️⃣ Бот обработает и покажет результат\n"
             "3️⃣ Нажмите '✅ Да' чтобы сохранить рецепт\n\n"
@@ -144,7 +150,9 @@ class RecipeBot:
         
         elif text == "📋 Меню":
             await update.message.reply_text(
-                f"📋 *{user_name}, главное меню*\n\n"
+                f"📋 *Главное меню*
+
+"
                 "Используйте кнопки ниже для навигации:",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=self.get_main_keyboard()
@@ -157,7 +165,9 @@ class RecipeBot:
         # Обычное сообщение
         else:
             await update.message.reply_text(
-                f"👋 *{user_name}, отправьте ссылку на рецепт!*\n\n"
+                f"👋 *Отправьте ссылку на рецепт!*
+
+"
                 "Или используйте кнопки меню ниже.",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=self.get_main_keyboard()
@@ -172,7 +182,9 @@ class RecipeBot:
         
         if not categories:
             await update.message.reply_text(
-                f"📭 *{user_name}, у вас пока нет сохраненных рецептов*\n\n"
+                f"📭 *Пока нет сохраненных рецептов*
+
+"
                 "Отправьте ссылку на рецепт и нажмите 'Да' чтобы сохранить!",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=InlineKeyboardMarkup([
@@ -189,7 +201,9 @@ class RecipeBot:
             logger.info(f"  → Добавлена кнопка: {button_text} -> {callback_data}")
         
         await update.message.reply_text(
-            f"📚 *{user_name}, ваши сохраненные рецепты*\n\n"
+            f"📚 *Ваши сохраненные рецепты*
+
+"
             "Выберите категорию:",
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=InlineKeyboardMarkup(keyboard)
@@ -224,7 +238,7 @@ class RecipeBot:
             
             elif data == "dont_save":
                 logger.info("→ Отмена сохранения")
-                await query.edit_message_text(f"👌 {user_name}, рецепт не сохранен")
+                await query.edit_message_text(f"👌 *Рецепт не сохранен*")
                 if user_id in self.temp_recipes:
                     del self.temp_recipes[user_id]
             
@@ -267,7 +281,9 @@ class RecipeBot:
                 await query.delete_message()
                 # Отправляем новое сообщение с клавиатурой
                 await query.message.reply_text(
-                    f"📋 *{user_name}, главное меню*\n\n"
+                    f"📋 *Главное меню*
+
+"
                     "Используйте кнопки ниже:",
                     parse_mode=ParseMode.MARKDOWN,
                     reply_markup=self.get_main_keyboard()
@@ -280,7 +296,7 @@ class RecipeBot:
             logger.error(f"❌ Ошибка в callback {data}: {e}", exc_info=True)
             try:
                 await query.edit_message_text(
-                    f"❌ *{user_name}, произошла ошибка*\n\nПопробуйте еще раз.",
+                    "❌ *, произошла ошибка*\n\nПопробуйте еще раз.",
                     parse_mode=ParseMode.MARKDOWN
                 )
             except:
@@ -294,7 +310,9 @@ class RecipeBot:
         
         if not categories:
             await query.edit_message_text(
-                f"📭 *{user_name}, у вас пока нет сохраненных рецептов*\n\n"
+                f"📭 *Пока нет сохраненных рецептов*
+
+"
                 "Отправьте ссылку на рецепт и нажмите 'Да' чтобы сохранить!",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=InlineKeyboardMarkup([
@@ -312,7 +330,9 @@ class RecipeBot:
         keyboard.append([InlineKeyboardButton("◀️ Закрыть", callback_data="back_to_menu")])
         
         await query.edit_message_text(
-            f"📚 *{user_name}, ваши сохраненные рецепты*\n\n"
+            f"📚 *Ваши сохраненные рецепты*
+
+"
             "Выберите категорию:",
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=InlineKeyboardMarkup(keyboard)
@@ -399,7 +419,7 @@ class RecipeBot:
         
         if self.storage.delete_recipe(user_id, category, filename):
             await query.edit_message_text(
-                f"✅ *{user_name}, рецепт удален*",
+                f"✅ *Рецепт удален*",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton("◀️ Назад к категориям", callback_data="back_to_categories")]
@@ -416,7 +436,7 @@ class RecipeBot:
     async def show_help_inline(self, query, user_name: str):
         """Показ помощи через инлайн"""
         help_text = (
-            f"📚 *{user_name}, как пользоваться:*\n\n"
+            "📚 *, как пользоваться:*\n\n"
             "• Отправьте ссылку на рецепт\n"
             "• Нажмите 'Да' чтобы сохранить\n"
             "• Используйте кнопки меню для навигации"
@@ -436,7 +456,7 @@ class RecipeBot:
         
         if user_id not in self.temp_recipes:
             logger.error(f"❌ Рецепт {recipe_id} не найден")
-            await query.edit_message_text(f"❌ {user_name}, рецепт не найден")
+            await query.edit_message_text("❌ , рецепт не найден")
             return
         
         recipe = self.temp_recipes[user_id]
@@ -450,7 +470,7 @@ class RecipeBot:
         
         # Просто подтверждаем сохранение без дополнительных кнопок
         await query.edit_message_text(
-            f"✅ *{user_name}, рецепт сохранен!*
+            "✅ *, рецепт сохранен!*
 
 "
             f"📁 Категория: {category_name}
@@ -468,13 +488,13 @@ class RecipeBot:
         
         if not validate_url(url):
             await update.message.reply_text(
-                f"❌ {user_name}, это некорректная ссылка",
+                f"❌ *Это некорректная ссылка*",
                 reply_markup=self.get_main_keyboard()
             )
             return
         
         status_message = await update.message.reply_text(
-            f"🔍 *{user_name}, бот читает страницу...*",
+            f"🔍 *Читаю страницу, один момент\.\.\.*",
             parse_mode=ParseMode.MARKDOWN
         )
         
@@ -483,7 +503,7 @@ class RecipeBot:
             raw_text = await self.parser.parse_recipe(url)
             
             await status_message.edit_text(
-                f"🤖 *{user_name}, анализирую рецепт и считаю КБЖУ...*",
+                f"🤖 *Анализирую рецепт и считаю КБЖУ\.\.\.*",
                 parse_mode=ParseMode.MARKDOWN
             )
             
@@ -510,7 +530,7 @@ class RecipeBot:
             
             # Кнопки сохранения отдельным сообщением
             await update.message.reply_text(
-                f"💾 *{user_name}, сохранить этот рецепт?*",
+                f"💾 *Сохранить этот рецепт в избранное?*",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=self.get_save_keyboard(recipe_id)
             )
@@ -520,7 +540,7 @@ class RecipeBot:
         except Exception as e:
             logger.error(f"Ошибка: {e}")
             await status_message.edit_text(
-                f"❌ *{user_name}, произошла ошибка:*\n`{str(e)[:200]}`",
+                "❌ *, произошла ошибка:*\n`{str(e)[:200]}`",
                 parse_mode=ParseMode.MARKDOWN
             )
     
@@ -565,7 +585,9 @@ class RecipeBot:
         
         elif text == "📋 Меню":
             await update.message.reply_text(
-                f"📋 *{user_name}, главное меню*\n\n"
+                f"📋 *Главное меню*
+
+"
                 "Используйте кнопки ниже для навигации:\n"
                 "• 📚 Сохраненные рецепты - просмотр избранного\n"
                 "• ℹ️ Помощь - справка\n\n"
@@ -581,7 +603,9 @@ class RecipeBot:
         # Обычное сообщение - подсказываем
         else:
             await update.message.reply_text(
-                f"👋 *{user_name}, отправьте ссылку на рецепт!*\n\n"
+                f"👋 *Отправьте ссылку на рецепт!*
+
+"
                 "Пример: `https://eda.ru/recepty/...`\n\n"
                 "Или используйте кнопки меню ниже.",
                 parse_mode=ParseMode.MARKDOWN,
