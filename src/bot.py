@@ -430,7 +430,7 @@ class RecipeBot:
             ])
         )
     
-    async def save_recipe_callback(self, query, user_id: int, user_name: str, recipe_id: str):
+        async def save_recipe_callback(self, query, user_id: int, user_name: str, recipe_id: str):
         """Сохранение рецепта"""
         logger.info(f"💾 Сохранение рецепта {recipe_id} для пользователя {user_id}")
         
@@ -448,19 +448,18 @@ class RecipeBot:
         
         logger.info(f"✅ Рецепт сохранен в {filepath}")
         
+        # Просто подтверждаем сохранение без дополнительных кнопок
         await query.edit_message_text(
-            f"✅ *{user_name}, рецепт сохранен!*\n\n"
-            f"📁 Категория: {category_name}\n"
-            f"📄 {recipe.get('title', 'Блюдо')}\n\n"
-            f"Нажмите '📚 Сохраненные рецепты' на клавиатуре чтобы посмотреть!",
-            parse_mode=ParseMode.MARKDOWN,
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("📚 Смотреть сохраненные", callback_data="menu_saved")]
-            ])
+            f"✅ *{user_name}, рецепт сохранен!*
+
+"
+            f"📁 Категория: {category_name}
+"
+            f"📄 {recipe.get('title', 'Блюдо')}",
+            parse_mode=ParseMode.MARKDOWN
         )
         
         del self.temp_recipes[user_id]
-    
     async def handle_url(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработчик URL"""
         url = update.message.text.strip()
