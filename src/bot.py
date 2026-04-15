@@ -550,3 +550,41 @@ class RecipeBot:
     
     async def cleanup(self):
         await self.parser.close()
+
+    # В методе handle_message добавляем подсказку для обычных сообщений
+    async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Обработчик текстовых сообщений"""
+        text = update.message.text.strip()
+        user_name = self.get_user_name(update)
+        
+        # Обработка кнопок Reply Keyboard
+        if text == "📚 Сохраненные рецепты":
+            await self.show_saved_recipes(update, context)
+        
+        elif text == "ℹ️ Помощь":
+            await self.help_command(update, context)
+        
+        elif text == "📋 Меню":
+            await update.message.reply_text(
+                f"📋 *{user_name}, главное меню*\n\n"
+                "Используйте кнопки ниже для навигации:\n"
+                "• 📚 Сохраненные рецепты - просмотр избранного\n"
+                "• ℹ️ Помощь - справка\n\n"
+                "💡 *Чтобы обработать рецепт, просто отправьте ссылку на него!*",
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=self.get_main_keyboard()
+            )
+        
+        # Если это URL - обрабатываем как рецепт
+        elif text.startswith(('http://', 'https://')):
+            await self.handle_url(update, context)
+        
+        # Обычное сообщение - подсказываем
+        else:
+            await update.message.reply_text(
+                f"👋 *{user_name}, отправьте ссылку на рецепт!*\n\n"
+                "Пример: `https://eda.ru/recepty/...`\n\n"
+                "Или используйте кнопки меню ниже.",
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=self.get_main_keyboard()
+            )
