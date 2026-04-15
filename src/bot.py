@@ -14,6 +14,8 @@ from utils import format_recipe_for_telegram, save_recipe_to_file, validate_url
 logger = logging.getLogger(__name__)
 
 class RecipeBot:
+    """Telegram бот для парсинга рецептов"""
+    
     def __init__(self, telegram_token: str, github_token: str):
         self.telegram_token = telegram_token
         self.parser = RecipeParser()
@@ -44,7 +46,7 @@ class RecipeBot:
             "• Тип блюда (🍳 завтрак, 🍲 обед, 🍽 ужин, 🍰 десерт)\n"
             "• Время приготовления\n"
             "• КБЖУ на порцию и на 100г\n"
-            "• Диетические метки (веган, без глютена и т.д.)\n\n"
+            "• Диетические метки\n\n"
             "*Рецепты сохраняются локально в папку output/*"
         )
         
@@ -57,41 +59,37 @@ class RecipeBot:
             await update.message.reply_text("❌ Некорректная ссылка")
             return
         
-        # Отправляем начальное сообщение и сохраняем его ID
         status_message = await update.message.reply_text("🔍 Начинаю обработку рецепта...")
-        message_id = status_message.message_id
         chat_id = update.effective_chat.id
+        message_id = status_message.message_id
         
         try:
-            # Функция для безопасного обновления статуса
-            async def update_status(text: str):
-                try:
-                    await context.bot.edit_message_text(
-                        chat_id=chat_id,
-                        message_id=message_id,
-                        text=text
-                    )
-                except Exception as e:
-                    logger.warning(f"Не удалось обновить статус: {e}")
+            # Обновление статуса
+            await context.bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text="🌐 Парсим страницу..."
+            )
             
-            await update_status("🌐 Парсим страницу...")
             raw_text = await self.parser.parse_recipe(url)
             
-            await update_status("🤖 GPT-4o анализирует рецепт и рассчитывает КБЖУ...")
+            await context.bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text="🤖 GPT-4o анализирует рецепт и рассчитывает КБЖУ..."
+            )
+            
             recipe = await self.normalizer.normalize(raw_text)
             recipe['source_url'] = url
             
             # Сохраняем локально
             filename = save_recipe_to_file(recipe)
             
-            # Форматируем текст для Telegram
+            # Форматируем текст
             formatted_text = format_recipe_for_telegram(recipe)
             
             # Удаляем статусное сообщение
-            try:
-                await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
-            except:
-                pass
+            await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
             
             # Отправляем результат
             await update.message.reply_text(
@@ -100,13 +98,11 @@ class RecipeBot:
                 disable_web_page_preview=True
             )
             
-            logger.info(f"✅ Рецепт обработан и сохранен: {filename}")
+            logger.info(f"✅ Рецепт обработан: {filename}")
             
         except Exception as e:
             logger.error(f"Ошибка обработки: {e}")
-            
-            # Пытаемся отправить ошибку
-            error_text = f"❌ Ошибка при обработке: {str(e)[:150]}"
+            error_text = f"❌ Ошибка: {str(e)[:150]}"
             try:
                 await context.bot.edit_message_text(
                     chat_id=chat_id,
@@ -117,26 +113,15 @@ class RecipeBot:
                 await update.message.reply_text(error_text)
     
     def run(self):
-        app = (
-            Application.builder()
-            .token(self.telegram_token)
-            .connect_timeout(60.0)
-            .read_timeout(60.0)
-            .write_timeout(60.0)
-            .build()
-        )
+        """Запуск бота"""
+        app = Application.builder().token(self.telegram_token).build()
         
         app.add_handler(CommandHandler("start", self.start_command))
         app.add_handler(CommandHandler("help", self.help_command))
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_url))
         
         logger.info("🚀 Бот запущен! Ожидаю сообщения...")
-        
-        try:
-            app.run_polling(drop_pending_updates=True)
-        except Exception as e:
-            logger.error(f"Критическая ошибка: {e}")
-            raise
+        app.run_polling(drop_pending_updates=True)
     
     async def cleanup(self):
         await self.parser.close()

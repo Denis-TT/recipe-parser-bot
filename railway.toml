@@ -1,0 +1,11 @@
+[build]
+builder = "NIXPACKS"
+nixpacksVersion = "1.29.0"
+
+[build.config]
+pythonVersion = "3.11"
+
+[deploy]
+startCommand = "python run.py"
+restartPolicyType = "ON_FAILURE"
+numReplicas = 1
