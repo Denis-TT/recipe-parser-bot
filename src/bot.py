@@ -78,7 +78,7 @@ class RecipeBot:
         user_name = self.get_user_name(update)
         
         welcome_text = (
-            f"👨‍🍳 *Привет, шеф-повар!*
+            f"👨‍🍳 *Привет, шеф-повар!*\n\n"
 
 "
             "Я бот для парсинга и сохранения рецептов.\n\n"
