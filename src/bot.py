@@ -95,7 +95,7 @@ class RecipeBot:
     async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
         await query.answer()
-        user_id = update.effective_user.id
+        logger.info(f"🔥 CALLBACK: {data} от user {user_id}")\n        print("🔥 CALLBACK:", data)\n        user_id = update.effective_user.id
         data = query.data
         logger.info(f"Callback: {data}")
         
