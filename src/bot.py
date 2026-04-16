@@ -35,6 +35,20 @@ class RecipeBot:
 
     TEMP_TTL_SECONDS = 20 * 60
     MAX_PARSE_RETRIES = 3
+    CATEGORY_KEY_ALIASES = {
+        "завтрак": "breakfast",
+        "обед": "lunch",
+        "ужин": "dinner",
+        "десерт": "dessert",
+        "перекус": "snack",
+        "закуска": "snack",
+        "салат": "salad",
+        "суп": "soup",
+        "выпечка": "baking",
+        "напиток": "drink",
+        "другое": "other",
+        "основное блюдо": "dinner",
+    }
 
     def __init__(self, telegram_token: str, github_token: str):
         self.telegram_token = telegram_token
@@ -283,6 +297,11 @@ class RecipeBot:
 
     # ========== СОХРАНЕННЫЕ РЕЦЕПТЫ ==========
 
+    @classmethod
+    def _normalize_category_key(cls, key: str) -> str:
+        normalized = (key or "").strip().lower()
+        return cls.CATEGORY_KEY_ALIASES.get(normalized, normalized or "other")
+
     async def show_saved_recipes(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
         categories = self.storage.get_user_categories(user_id)
@@ -297,7 +316,8 @@ class RecipeBot:
 
         keyboard = []
         for cat in categories:
-            callback_data = f"cat_{cat['key']}"
+            key = self._normalize_category_key(cat.get("key", "other"))
+            callback_data = f"cat_{key}"
             logger.info("Создана кнопка категории: %s", callback_data)
             keyboard.append(
                 [
@@ -353,7 +373,8 @@ class RecipeBot:
 
         keyboard = []
         for cat in categories:
-            callback_data = f"cat_{cat['key']}"
+            key = self._normalize_category_key(cat.get("key", "other"))
+            callback_data = f"cat_{key}"
             logger.info("Создана кнопка категории: %s", callback_data)
             keyboard.append(
                 [
