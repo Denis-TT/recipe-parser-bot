@@ -1,8 +1,9 @@
 import aiohttp
 from bs4 import BeautifulSoup
-import re
-import json
 from typing import Optional
+import logging
+
+logger = logging.getLogger(__name__)
 
 class RecipeParser:
     def __init__(self):
@@ -44,11 +45,11 @@ class RecipeParser:
             if len(text) > 50000:
                 text = text[:50000] + "..."
             
-            print(f"✅ Извлечено {len(text)} символов")
+            logger.info("✅ Извлечено %s символов", len(text))
             return text
             
         except Exception as e:
-            print(f"❌ Ошибка парсинга: {e}")
+            logger.error("❌ Ошибка парсинга: %s", e, exc_info=True)
             raise RuntimeError(f"Ошибка парсинга страницы: {e}") from e
     
     async def close(self):
