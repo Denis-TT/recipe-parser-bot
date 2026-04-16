@@ -61,14 +61,14 @@ class RecipeStorage:
     def get_recipes_in_category(self, user_id: int, category: str) -> List[Dict[str, Any]]:
         """Получение рецептов в категории"""
         if self.backend_type == "supabase":
-            recipes = self.backend.get_user_recipes(user_id, category)
+            recipes = self.backend.get_recipes_in_category(user_id, category)
             # Адаптация формата
             return [
                 {
                     "title": r.get("title"),
                     "recipe_uid": r.get("id"),
                     "calories": r.get("nutrition_per_serving", {}).get("calories", 0),
-                    "cook_time": r.get("total_time", 0),
+                    "cook_time": r.get("cook_time") or r.get("total_time", 0),
                     "filename": r.get("id")  # для совместимости
                 }
                 for r in recipes
