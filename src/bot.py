@@ -140,6 +140,8 @@ class RecipeBot:
         )
     
     async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        print("🔥🔥🔥 CALLBACK HANDLER CALLED! 🔥🔥🔥")
+        logger.info("🔥🔥🔥 CALLBACK HANDLER CALLED! 🔥🔥🔥")
         """Обработчик inline-кнопок"""
         query = update.callback_query
         await query.answer()

@@ -170,52 +170,36 @@ class SupabaseRecipeStorage:
             return False
     
     def get_categories(self, user_id: int) -> List[Dict[str, Any]]:
-        """
-        Получение категорий с количеством рецептов.
-        
-        Args:
-            user_id: ID пользователя
-            
-        Returns:
-            Список категорий для меню
-        """
+        """Получение категорий с количеством рецептов"""
         try:
-            # Используем RPC для агрегации
-            result = self.client.rpc(
-                'get_user_categories',
-                {'p_user_id': user_id}
-            ).execute()
-            
+            result = self.client.rpc('get_user_categories', {'p_user_id': user_id}).execute()
             if result.data:
                 return result.data
-            
-            # Fallback: группировка на клиенте
-            recipes = self.get_user_recipes(user_id, limit=1000)
-            
-            categories = {}
-            emoji_map = {
-                "breakfast": "🍳", "lunch": "🍲", "dinner": "🍽️",
-                "dessert": "🍰", "snack": "🥨", "salad": "🥗",
-                "soup": "🥣", "baking": "🧁", "drink": "🥤", "other": "📦"
-            }
-            
-            for recipe in recipes:
-                meal_type = recipe.get("meal_type", "other")
-                if meal_type not in categories:
-                    categories[meal_type] = {
-                        "key": meal_type,
-                        "name": meal_type.capitalize(),
-                        "emoji": emoji_map.get(meal_type, "🍴"),
-                        "count": 0
-                    }
-                categories[meal_type]["count"] += 1
-            
-            return sorted(categories.values(), key=lambda x: x["count"], reverse=True)
-            
         except Exception as e:
-            logger.error(f"❌ Ошибка получения категорий: {e}")
-            return []
-    
+            logger.warning(f"RPC не сработал: {e}, используем fallback")
+        
+        # Fallback: группировка на клиенте
+        recipes = self.get_user_recipes(user_id, limit=1000)
+        
+        categories = {}
+        emoji_map = {
+            "breakfast": "🍳", "lunch": "🍲", "dinner": "🍽️",
+            "dessert": "🍰", "snack": "🥨", "salad": "🥗",
+            "soup": "🥣", "baking": "🧁", "drink": "🥤", "other": "📦"
+        }
+        
+        for recipe in recipes:
+            meal_type = recipe.get("meal_type", "other")
+            if meal_type not in categories:
+                categories[meal_type] = {
+                    "key": meal_type,
+                    "name": meal_type.capitalize(),
+                    "emoji": emoji_map.get(meal_type, "🍴"),
+                    "count": 0
+                }
+            categories[meal_type]["count"] += 1
+        
+        return sorted(categories.values(), key=lambda x: x["count"], reverse=True)
     def search_recipes(self, user_id: int, query: str) -> List[Dict[str, Any]]:
         """
         Поиск рецептов.
