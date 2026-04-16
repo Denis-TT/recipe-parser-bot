@@ -134,8 +134,12 @@ class SupabaseRecipeStorage:
         Returns:
             Список рецептов в категории
         """
-        normalized_category = (category or "").strip()
+        normalized_category = self._normalize_category_key(category)
         recipes = self.get_user_recipes(user_id, meal_type=normalized_category, limit=limit)
+        if not recipes:
+            russian_category = self._category_key_to_ru(normalized_category)
+            if russian_category != normalized_category:
+                recipes = self.get_user_recipes(user_id, meal_type=russian_category, limit=limit)
         logger.info(
             "📚 get_recipes_in_category: user_id=%s, category=%s, found=%s",
             user_id,
@@ -196,7 +200,18 @@ class SupabaseRecipeStorage:
         try:
             result = self.client.rpc("get_user_categories", {"p_user_id": user_id}).execute()
             if result.data:
-                return result.data
+                normalized_categories = []
+                for item in result.data:
+                    key = self._normalize_category_key(item.get("key", "other"))
+                    normalized_categories.append(
+                        {
+                            "key": key,
+                            "name": item.get("name", self._category_name(key)),
+                            "emoji": item.get("emoji", self._category_emoji(key)),
+                            "count": item.get("count", 0),
+                        }
+                    )
+                return normalized_categories
             logger.info("RPC get_user_categories вернул пустой ответ, используем fallback")
         except Exception as e:
             logger.warning(f"RPC get_user_categories не сработал: {e}, используем fallback")
@@ -212,7 +227,7 @@ class SupabaseRecipeStorage:
         }
         
         for recipe in recipes:
-            meal_type = recipe.get("meal_type", "other")
+            meal_type = self._normalize_category_key(recipe.get("meal_type", "other"))
             if meal_type not in categories:
                 categories[meal_type] = {
                     "key": meal_type,
@@ -239,6 +254,57 @@ class SupabaseRecipeStorage:
             "other": "Другое",
         }
         return names.get(meal_type, meal_type.capitalize())
+
+    @staticmethod
+    def _normalize_category_key(meal_type: Optional[str]) -> str:
+        aliases = {
+            "завтрак": "breakfast",
+            "обед": "lunch",
+            "ужин": "dinner",
+            "десерт": "dessert",
+            "перекус": "snack",
+            "закуска": "snack",
+            "салат": "salad",
+            "суп": "soup",
+            "выпечка": "baking",
+            "напиток": "drink",
+            "другое": "other",
+            "основное блюдо": "dinner",
+        }
+        normalized = (meal_type or "").strip().lower()
+        return aliases.get(normalized, normalized or "other")
+
+    @staticmethod
+    def _category_key_to_ru(category_key: str) -> str:
+        names = {
+            "breakfast": "завтрак",
+            "lunch": "обед",
+            "dinner": "ужин",
+            "dessert": "десерт",
+            "snack": "перекус",
+            "salad": "салат",
+            "soup": "суп",
+            "baking": "выпечка",
+            "drink": "напиток",
+            "other": "другое",
+        }
+        return names.get(category_key, category_key)
+
+    @staticmethod
+    def _category_emoji(category_key: str) -> str:
+        emoji_map = {
+            "breakfast": "🍳",
+            "lunch": "🍲",
+            "dinner": "🍽️",
+            "dessert": "🍰",
+            "snack": "🥨",
+            "salad": "🥗",
+            "soup": "🥣",
+            "baking": "🧁",
+            "drink": "🥤",
+            "other": "📦",
+        }
+        return emoji_map.get(category_key, "🍴")
     def search_recipes(self, user_id: int, query: str) -> List[Dict[str, Any]]:
         """
         Поиск рецептов.
