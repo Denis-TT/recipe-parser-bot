@@ -31,6 +31,8 @@ class RecipeBot:
         ]
         return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     def get_save_keyboard(self, recipe_id: str) -> InlineKeyboardMarkup:
+        logger.info(f"🔘 Созданы кнопки сохранения с recipe_id={recipe_id}")
+        print(f"🔘 Созданы кнопки сохранения с recipe_id={recipe_id}")
         """Клавиатура для сохранения рецепта"""
         keyboard = [[
             InlineKeyboardButton("✅ Да, сохранить", callback_data=f"save_{recipe_id}"),
@@ -299,7 +301,13 @@ class RecipeBot:
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
         app.add_handler(CallbackQueryHandler(self.handle_callback))
         logger.info("🤖 Бот готов к работе!")
+        app.add_error_handler(self.error_handler)
         app.run_polling(drop_pending_updates=True)
+
+    async def error_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        logger.error(f"❌ Ошибка: {context.error}", exc_info=True)
+        print(f"❌ Ошибка: {context.error}")
+
     async def cleanup(self):
         """Очистка ресурсов"""
         await self.parser.close()
