@@ -216,3 +216,22 @@ async def show_recipe(self, query, user_id: int, category: str, recipe_uid: str)
 
     async def cleanup(self):
         await self.parser.close()
+
+    async def post_init(self, application: Application):
+        """Вызывается после инициализации приложения"""
+        await self.setup_commands(application)
+
+    def run(self):
+        """Запуск бота"""
+        app = Application.builder().token(self.telegram_token).post_init(self.post_init).build()
+        app.add_handler(CommandHandler("start", self.start_command))
+        app.add_handler(CommandHandler("menu", self.menu_command))
+        app.add_handler(CommandHandler("saved", self.saved_command))
+        app.add_handler(CommandHandler("help", self.help_command))
+        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
+        app.add_handler(CallbackQueryHandler(self.handle_callback))
+        logger.info("🚀 Бот запущен!")
+        app.run_polling(drop_pending_updates=True)
+
+    async def cleanup(self):
+        await self.parser.close()
