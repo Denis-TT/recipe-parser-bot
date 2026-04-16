@@ -90,7 +90,6 @@ class RecipeBot:
             )
         elif text.startswith(('http://', 'https://')):
             await self.handle_url(update, context)
-        else:
             await update.message.reply_text(
                 "👋 *Отправьте ссылку на рецепт!*\n\n"
                 "Пример: `https://eda.ru/recepty/...`",
@@ -229,7 +228,6 @@ class RecipeBot:
                 "✅ Рецепт удален",
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
-        else:
             await query.edit_message_text("❌ Не удалось удалить рецепт")
     async def save_recipe_callback(self, query, user_id: int, recipe_id: str):
         """Сохранение рецепта"""
@@ -291,7 +289,7 @@ class RecipeBot:
         await self.setup_commands(application)
         logger.info("✅ Post-init выполнен")
     def run(self):
-        logger.info("🚀 Запуск приложения через Webhook...")
+        logger.info("🚀 Запуск приложения через Polling...")
         
         app = Application.builder().token(self.telegram_token).post_init(self.post_init).build()
         
@@ -303,22 +301,8 @@ class RecipeBot:
         app.add_handler(CallbackQueryHandler(self.handle_callback))
         app.add_error_handler(self.error_handler)
         
-        railway_url = os.environ.get("RAILWAY_PUBLIC_DOMAIN", "")
-        port = int(os.environ.get("PORT", 8443))
-        
-        if railway_url:
-            webhook_url = f"https://{railway_url}/webhook"
-            logger.info(f"🌐 Webhook URL: {webhook_url}")
-            app.run_webhook(
-                listen="0.0.0.0",
-                port=port,
-                url_path="webhook",
-                webhook_url=webhook_url,
-                drop_pending_updates=True
-            )
-        else:
-            logger.warning("⚠️ RAILWAY_PUBLIC_DOMAIN не найден, использую polling")
-            app.run_polling(drop_pending_updates=True)
+        logger.info("🤖 Бот готов к работе!")
+        app.run_polling(drop_pending_updates=True)
 
     async def error_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"❌ Ошибка: {context.error}", exc_info=True)
