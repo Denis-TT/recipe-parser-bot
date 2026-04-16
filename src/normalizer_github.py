@@ -18,7 +18,7 @@ class GitHubModelNormalizer:
     "title": "Название блюда",
     "description": "Краткое описание",
     "cuisine": "Кухня мира",
-    "meal_type": "завтрак/обед/ужин/десерт/закуска/напиток",
+    "meal_type": "breakfast/lunch/dinner/dessert/snack/salad/soup/baking/drink/other",
     "difficulty": "легко/средне/сложно",
     "prep_time": 20,
     "cook_time": 30,
@@ -50,6 +50,7 @@ class GitHubModelNormalizer:
 }
 
 ВАЖНО: 
+- meal_type должен быть ТОЛЬКО на английском языке (breakfast, lunch, dinner, dessert, snack, salad, soup, baking, drink, other)
 - nutrition_per_serving - КБЖУ на ОДНУ порцию
 - nutrition - КБЖУ на 100 грамм готового блюда
 - ВСЕ числа должны быть рассчитаны на основе ингредиентов
@@ -108,6 +109,28 @@ class GitHubModelNormalizer:
                     content = content.strip()
                     
                     result = json.loads(content)
+
+                    # Маппинг на случай, если модель вернула meal_type на кириллице
+                    meal_type_map = {
+                        "завтрак": "breakfast",
+                        "обед": "lunch",
+                        "ужин": "dinner",
+                        "десерт": "dessert",
+                        "перекус": "snack",
+                        "закуска": "snack",
+                        "салат": "salad",
+                        "суп": "soup",
+                        "выпечка": "baking",
+                        "напиток": "drink",
+                        "другое": "other",
+                        "основное блюдо": "dinner",
+                    }
+
+                    meal_type = str(result.get("meal_type", "other")).strip().lower()
+                    if meal_type in meal_type_map:
+                        result["meal_type"] = meal_type_map[meal_type]
+                    else:
+                        result["meal_type"] = meal_type or "other"
                     
                     # Проверяем и исправляем КБЖУ на 100г если оно неправильное
                     serving = result.get('servings', 1)
