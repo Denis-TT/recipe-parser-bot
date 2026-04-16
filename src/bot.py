@@ -149,7 +149,6 @@ class RecipeBot:
         keyboard.append([InlineKeyboardButton(f"📖 {title[:30]}", callback_data=f"view_{category}_{recipe['recipe_uid']}")])
         keyboard.append([InlineKeyboardButton("◀️ Назад к категориям", callback_data="back_to_categories")])
         await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=InlineKeyboardMarkup(keyboard))
-main+history
 
 async def show_recipe(self, query, user_id: int, category: str, recipe_uid: str):
     recipe = self.storage.get_recipe_by_uid(user_id, category, recipe_uid)
