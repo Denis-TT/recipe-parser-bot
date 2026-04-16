@@ -49,6 +49,18 @@ class RecipeBot:
         "другое": "other",
         "основное блюдо": "dinner",
     }
+    MEAL_TYPE_NAMES = {
+        "breakfast": "🍳 Завтраки",
+        "lunch": "🍲 Обеды",
+        "dinner": "🍽️ Ужины",
+        "dessert": "🍰 Десерты",
+        "snack": "🥨 Перекусы",
+        "salad": "🥗 Салаты",
+        "soup": "🥣 Супы",
+        "baking": "🧁 Выпечка",
+        "drink": "🥤 Напитки",
+        "other": "📦 Другое",
+    }
 
     def __init__(self, telegram_token: str, github_token: str):
         self.telegram_token = telegram_token
@@ -293,7 +305,8 @@ class RecipeBot:
 
         except Exception as error:
             logger.error("❌ Ошибка обработки URL: %s", error, exc_info=True)
-            await status_message.edit_text("❌ Ошибка обработки рецепта. Попробуйте другой сайт.")
+            self.temp_recipes.pop(user_id, None)
+            await status_message.edit_text(f"❌ Ошибка: {str(error)[:200]}")
 
     # ========== СОХРАНЕННЫЕ РЕЦЕПТЫ ==========
 
@@ -316,13 +329,14 @@ class RecipeBot:
 
         keyboard = []
         for cat in categories:
-            key = self._normalize_category_key(cat.get("key", "other"))
-            callback_data = f"cat_{key}"
+            latin_key = self._normalize_category_key(cat.get("key", "other"))
+            display_name = self.MEAL_TYPE_NAMES.get(latin_key, latin_key)
+            callback_data = f"cat_{latin_key}"
             logger.info("Создана кнопка категории: %s", callback_data)
             keyboard.append(
                 [
                     InlineKeyboardButton(
-                        f"{cat['name']} ({cat['count']})",
+                        f"{display_name} ({cat['count']})",
                         callback_data=callback_data,
                     )
                 ]
@@ -373,13 +387,14 @@ class RecipeBot:
 
         keyboard = []
         for cat in categories:
-            key = self._normalize_category_key(cat.get("key", "other"))
-            callback_data = f"cat_{key}"
+            latin_key = self._normalize_category_key(cat.get("key", "other"))
+            display_name = self.MEAL_TYPE_NAMES.get(latin_key, latin_key)
+            callback_data = f"cat_{latin_key}"
             logger.info("Создана кнопка категории: %s", callback_data)
             keyboard.append(
                 [
                     InlineKeyboardButton(
-                        f"{cat['name']} ({cat['count']})",
+                        f"{display_name} ({cat['count']})",
                         callback_data=callback_data,
                     )
                 ]
