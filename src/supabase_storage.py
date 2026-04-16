@@ -172,15 +172,16 @@ class SupabaseRecipeStorage:
     def get_categories(self, user_id: int) -> List[Dict[str, Any]]:
         """Получение категорий с количеством рецептов"""
         try:
-            result = self.client.rpc('get_user_categories', {'p_user_id': user_id}).execute()
+            result = self.client.rpc("get_user_categories", {"p_user_id": user_id}).execute()
             if result.data:
                 return result.data
+            logger.info("RPC get_user_categories вернул пустой ответ, используем fallback")
         except Exception as e:
-            logger.warning(f"RPC не сработал: {e}, используем fallback")
-        
+            logger.warning(f"RPC get_user_categories не сработал: {e}, используем fallback")
+
         # Fallback: группировка на клиенте
         recipes = self.get_user_recipes(user_id, limit=1000)
-        
+
         categories = {}
         emoji_map = {
             "breakfast": "🍳", "lunch": "🍲", "dinner": "🍽️",
@@ -193,13 +194,29 @@ class SupabaseRecipeStorage:
             if meal_type not in categories:
                 categories[meal_type] = {
                     "key": meal_type,
-                    "name": meal_type.capitalize(),
+                    "name": self._category_name(meal_type),
                     "emoji": emoji_map.get(meal_type, "🍴"),
                     "count": 0
                 }
             categories[meal_type]["count"] += 1
-        
+
         return sorted(categories.values(), key=lambda x: x["count"], reverse=True)
+
+    @staticmethod
+    def _category_name(meal_type: str) -> str:
+        names = {
+            "breakfast": "Завтраки",
+            "lunch": "Обеды",
+            "dinner": "Ужины",
+            "dessert": "Десерты",
+            "snack": "Перекусы",
+            "salad": "Салаты",
+            "soup": "Супы",
+            "baking": "Выпечка",
+            "drink": "Напитки",
+            "other": "Другое",
+        }
+        return names.get(meal_type, meal_type.capitalize())
     def search_recipes(self, user_id: int, query: str) -> List[Dict[str, Any]]:
         """
         Поиск рецептов.
