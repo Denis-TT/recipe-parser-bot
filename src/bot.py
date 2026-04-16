@@ -291,18 +291,34 @@ class RecipeBot:
         await self.setup_commands(application)
         logger.info("✅ Post-init выполнен")
     def run(self):
-        """Запуск бота"""
-        logger.info("🚀 Запуск приложения...")
+        logger.info("🚀 Запуск приложения через Webhook...")
+        
         app = Application.builder().token(self.telegram_token).post_init(self.post_init).build()
+        
         app.add_handler(CommandHandler("start", self.start_command))
         app.add_handler(CommandHandler("menu", self.menu_command))
         app.add_handler(CommandHandler("saved", self.saved_command))
         app.add_handler(CommandHandler("help", self.help_command))
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
         app.add_handler(CallbackQueryHandler(self.handle_callback))
-        logger.info("🤖 Бот готов к работе!")
         app.add_error_handler(self.error_handler)
-        app.run_polling(drop_pending_updates=True)
+        
+        railway_url = os.environ.get("RAILWAY_PUBLIC_DOMAIN", "")
+        port = int(os.environ.get("PORT", 8443))
+        
+        if railway_url:
+            webhook_url = f"https://{railway_url}/webhook"
+            logger.info(f"🌐 Webhook URL: {webhook_url}")
+            app.run_webhook(
+                listen="0.0.0.0",
+                port=port,
+                url_path="webhook",
+                webhook_url=webhook_url,
+                drop_pending_updates=True
+            )
+        else:
+            logger.warning("⚠️ RAILWAY_PUBLIC_DOMAIN не найден, использую polling")
+            app.run_polling(drop_pending_updates=True)
 
     async def error_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"❌ Ошибка: {context.error}", exc_info=True)
