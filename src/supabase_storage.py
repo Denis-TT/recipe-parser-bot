@@ -121,6 +121,28 @@ class SupabaseRecipeStorage:
         except Exception as e:
             logger.error(f"❌ Ошибка загрузки рецептов: {e}")
             return []
+
+    def get_recipes_in_category(self, user_id: int, category: str, limit: int = 50) -> List[Dict[str, Any]]:
+        """
+        Получение рецептов пользователя по категории meal_type.
+
+        Args:
+            user_id: ID пользователя Telegram
+            category: Категория (meal_type)
+            limit: Максимальное число рецептов
+
+        Returns:
+            Список рецептов в категории
+        """
+        normalized_category = (category or "").strip()
+        recipes = self.get_user_recipes(user_id, meal_type=normalized_category, limit=limit)
+        logger.info(
+            "📚 get_recipes_in_category: user_id=%s, category=%s, found=%s",
+            user_id,
+            normalized_category,
+            len(recipes),
+        )
+        return recipes
     
     def get_recipe(self, recipe_id: str) -> Optional[Dict[str, Any]]:
         """

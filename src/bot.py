@@ -295,15 +295,18 @@ class RecipeBot:
             )
             return
 
-        keyboard = [
-            [
-                InlineKeyboardButton(
-                    f"{cat['name']} ({cat['count']})",
-                    callback_data=f"cat_{cat['key']}",
-                )
-            ]
-            for cat in categories
-        ]
+        keyboard = []
+        for cat in categories:
+            callback_data = f"cat_{cat['key']}"
+            logger.info("Создана кнопка категории: %s", callback_data)
+            keyboard.append(
+                [
+                    InlineKeyboardButton(
+                        f"{cat['name']} ({cat['count']})",
+                        callback_data=callback_data,
+                    )
+                ]
+            )
 
         await update.message.reply_text(
             "📚 *Ваши сохраненные рецепты*\n\nВыберите категорию:",
@@ -323,16 +326,18 @@ class RecipeBot:
 
         try:
             if data.startswith("cat_"):
-                category = data.replace("cat_", "")
+                category = data[len("cat_") :]
                 await self.show_recipes_in_category(query, user_id, category)
             elif data.startswith("view_"):
-                parts = data.split("_", 2)
-                if len(parts) >= 3:
-                    await self.show_recipe(query, user_id, parts[1], parts[2])
+                payload = data[len("view_") :]
+                if "_" in payload:
+                    category, recipe_uid = payload.rsplit("_", 1)
+                    await self.show_recipe(query, user_id, category, recipe_uid)
             elif data.startswith("delete_"):
-                parts = data.split("_", 2)
-                if len(parts) >= 3:
-                    await self.delete_recipe_callback(query, user_id, parts[1], parts[2])
+                payload = data[len("delete_") :]
+                if "_" in payload:
+                    category, recipe_uid = payload.rsplit("_", 1)
+                    await self.delete_recipe_callback(query, user_id, category, recipe_uid)
             elif data == "back_to_categories":
                 await self.show_categories_inline(query, user_id)
         except Exception as error:
@@ -346,15 +351,18 @@ class RecipeBot:
             await query.edit_message_text("📭 Пока нет сохраненных рецептов")
             return
 
-        keyboard = [
-            [
-                InlineKeyboardButton(
-                    f"{cat['name']} ({cat['count']})",
-                    callback_data=f"cat_{cat['key']}",
-                )
-            ]
-            for cat in categories
-        ]
+        keyboard = []
+        for cat in categories:
+            callback_data = f"cat_{cat['key']}"
+            logger.info("Создана кнопка категории: %s", callback_data)
+            keyboard.append(
+                [
+                    InlineKeyboardButton(
+                        f"{cat['name']} ({cat['count']})",
+                        callback_data=callback_data,
+                    )
+                ]
+            )
 
         await query.edit_message_text(
             "📚 *Выберите категорию:*",
@@ -364,6 +372,7 @@ class RecipeBot:
 
     async def show_recipes_in_category(self, query, user_id: int, category: str):
         recipes = self.storage.get_recipes_in_category(user_id, category)
+        logger.info("📖 Категория: %s, рецептов: %s", category, len(recipes))
         category_name = self.storage.get_category_name(category)
 
         if not recipes:
@@ -378,7 +387,7 @@ class RecipeBot:
         keyboard = []
 
         for i, recipe in enumerate(recipes[:15]):
-            title = recipe["title"][:40]
+            title = (recipe.get("title") or "Без названия")[:40]
             calories = recipe.get("calories", 0)
             cook_time = recipe.get("cook_time", 0)
 
