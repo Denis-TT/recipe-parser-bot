@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import time
 from typing import Any, Dict, Optional
 
@@ -10,6 +11,7 @@ from telegram import (
     ReplyKeyboardMarkup,
     ReplyKeyboardRemove,
     Update,
+    WebAppInfo,
 )
 from telegram.constants import ParseMode
 from telegram.ext import (
@@ -124,10 +126,15 @@ class RecipeBot:
         )
 
     async def menu_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        webapp_url = os.environ.get("WEBAPP_URL", "https://your-app.railway.app")
+        keyboard = [
+            [InlineKeyboardButton("📚 Сохраненные рецепты", web_app=WebAppInfo(url=webapp_url))],
+            [InlineKeyboardButton("ℹ️ Помощь", callback_data="menu_help")],
+        ]
         await update.message.reply_text(
             "📋 *Главное меню*\n\nВыберите действие:",
             parse_mode=ParseMode.MARKDOWN,
-            reply_markup=self.get_menu_keyboard(),
+            reply_markup=InlineKeyboardMarkup(keyboard),
         )
 
     async def saved_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -170,7 +177,7 @@ class RecipeBot:
         logger.info("📨 Получено сообщение от %s: %s", user_id, text[:80])
 
         if text == "📚 Сохраненные рецепты":
-            await self.show_saved_recipes(update, context)
+            await self.menu_command(update, context)
             return
         if text == "ℹ️ Помощь":
             await self.help_command(update, context)
@@ -360,6 +367,16 @@ class RecipeBot:
         print(f"🔥🔥🔥 CALLBACK ПОЛУЧЕН: {data} от user {user_id}")
 
         try:
+            if data == "menu_help":
+                await query.edit_message_text(
+                    "📚 *Как пользоваться ботом*\n\n"
+                    "1️⃣ Отправьте ссылку на рецепт\n"
+                    "2️⃣ Бот обработает рецепт\n"
+                    "3️⃣ Нажмите «✅ Да, сохранить» чтобы сохранить\n\n"
+                    "Открывайте «📚 Сохраненные рецепты» через Mini App в меню.",
+                    parse_mode=ParseMode.MARKDOWN,
+                )
+                return
             if data.startswith("cat_"):
                 category = data[len("cat_") :]
                 await self.show_recipes_in_category(query, user_id, category)
