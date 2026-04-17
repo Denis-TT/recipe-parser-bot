@@ -26,7 +26,7 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 from bot import RecipeBot
 
 LOCK_FILE_PATH = "/tmp/recipe_bot.lock"
-LOCK_FD: Optional[int] = None
+lock_fd: Optional[object] = None
 
 
 class JsonFormatter(logging.Formatter):
@@ -83,36 +83,39 @@ def configure_logging() -> None:
     root_logger.addHandler(file_handler)
 
 
-def ensure_single_instance(lock_file_path: str = LOCK_FILE_PATH) -> int:
+def ensure_single_instance(lock_file_path: str = LOCK_FILE_PATH) -> bool:
     """Блокирует запуск второго экземпляра процесса."""
-    global LOCK_FD
+    global lock_fd
 
-    lock_fd = os.open(lock_file_path, os.O_RDWR | os.O_CREAT, 0o644)
     try:
-        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except BlockingIOError:
-        logging.getLogger(__name__).error(
-            "❌ Обнаружен второй экземпляр. Завершаем запуск во избежание 409 Conflict"
-        )
-        os.close(lock_fd)
+        lock_fd = open(lock_file_path, "w")
+        fcntl.lockf(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        logging.getLogger(__name__).info("✅ Запущен единственный экземпляр бота")
+        print("✅ Запущен единственный экземпляр бота")
+        return True
+    except IOError:
+        logging.getLogger(__name__).error("❌ Бот уже запущен! Завершение...")
+        print("❌ Бот уже запущен! Завершение...")
         sys.exit(1)
-
-    os.ftruncate(lock_fd, 0)
-    os.write(lock_fd, str(os.getpid()).encode("utf-8"))
-    LOCK_FD = lock_fd
-    return lock_fd
 
 
 def release_lock() -> None:
-    global LOCK_FD
-    if LOCK_FD is None:
+    global lock_fd
+    if lock_fd is None:
         return
 
     try:
-        fcntl.flock(LOCK_FD, fcntl.LOCK_UN)
+        fcntl.lockf(lock_fd, fcntl.LOCK_UN)
+        lock_fd.close()
+    except Exception:
+        pass
     finally:
-        os.close(LOCK_FD)
-        LOCK_FD = None
+        lock_fd = None
+
+    try:
+        os.remove(LOCK_FILE_PATH)
+    except Exception:
+        pass
 
 
 def start_health_server() -> Optional[HTTPServer]:

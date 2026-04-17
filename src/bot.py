@@ -356,7 +356,8 @@ class RecipeBot:
 
         user_id = update.effective_user.id
         data = query.data
-        logger.info("🔥 CALLBACK: %s", data)
+        logger.info("🔥🔥🔥 CALLBACK ПОЛУЧЕН: %s от user %s", data, user_id)
+        print(f"🔥🔥🔥 CALLBACK ПОЛУЧЕН: {data} от user {user_id}")
 
         try:
             if data.startswith("cat_"):
