@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import time
 from typing import Any, Dict, Optional
 
@@ -10,6 +11,7 @@ from telegram import (
     ReplyKeyboardMarkup,
     ReplyKeyboardRemove,
     Update,
+    WebAppInfo,
 )
 from telegram.constants import ParseMode
 from telegram.ext import (
@@ -95,6 +97,10 @@ class RecipeBot:
 
     async def post_init(self, application: Application) -> None:
         await self.setup_commands(application)
+        application.bot_data["webapp_url"] = os.environ.get(
+            "WEBAPP_URL",
+            "https://your-app.railway.app",
+        )
         logger.info("✅ Post-init выполнен")
 
     async def post_shutdown(self, _application: Application) -> None:
@@ -124,10 +130,23 @@ class RecipeBot:
         )
 
     async def menu_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        webapp_url = context.bot_data.get("webapp_url")
+        if not webapp_url:
+            webapp_url = "https://your-app.railway.app"
+
+        keyboard = [
+            [
+                InlineKeyboardButton(
+                    "📚 Сохраненные рецепты",
+                    web_app=WebAppInfo(url=webapp_url),
+                )
+            ],
+            [InlineKeyboardButton("ℹ️ Помощь", callback_data="menu_help")],
+        ]
         await update.message.reply_text(
             "📋 *Главное меню*\n\nВыберите действие:",
             parse_mode=ParseMode.MARKDOWN,
-            reply_markup=self.get_menu_keyboard(),
+            reply_markup=InlineKeyboardMarkup(keyboard),
         )
 
     async def saved_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -170,7 +189,7 @@ class RecipeBot:
         logger.info("📨 Получено сообщение от %s: %s", user_id, text[:80])
 
         if text == "📚 Сохраненные рецепты":
-            await self.show_saved_recipes(update, context)
+            await self.menu_command(update, context)
             return
         if text == "ℹ️ Помощь":
             await self.help_command(update, context)
@@ -374,6 +393,10 @@ class RecipeBot:
                     await self.delete_recipe_callback(query, user_id, category, recipe_uid)
             elif data == "back_to_categories":
                 await self.show_categories_inline(query, user_id)
+            elif data == "menu_help":
+                await query.message.reply_text(
+                    "📚 Отправьте ссылку на рецепт, затем откройте Mini App через пункт меню «Сохраненные рецепты»."
+                )
         except Exception as error:
             logger.error("❌ Ошибка в callback: %s", error, exc_info=True)
             await query.edit_message_text("❌ Ошибка обработки действия")
