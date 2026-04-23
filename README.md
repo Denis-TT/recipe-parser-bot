@@ -1,24 +1,35 @@
-# 🍳 Recipe Parser Bot
+# Recipe Parser Bot
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![GitHub Models](https://img.shields.io/badge/GitHub-Models-purple.svg)](https://github.com/marketplace/models)
+Production-oriented Telegram recipe bot with parser, mini app and Supabase/local storage fallback.
 
-Telegram бот для автоматического парсинга и нормализации кулинарных рецептов с использованием GitHub Models (GPT-4o).
+## Architecture
 
-## ✨ Возможности
+```
+app/
+  bot/         # Telegram bot orchestration and handlers
+  parser/      # HTML parsing and LLM normalization
+  backend/     # Repository layer (Supabase + local fallback)
+  shared/      # Config, constants, utils, logging
+api.py         # FastAPI for Mini App endpoints
+run.py         # Bot entrypoint
+webapp/        # Legacy static mini app frontend
+frontend/      # New frontend root (migration target)
+```
 
-- 🔍 Парсинг рецептов с любых кулинарных сайтов
-- 🤖 Извлечение структурированных данных через GPT-4o
-- 📝 Нормализация рецептов в единый формат JSON
-- 📊 Определение времени приготовления, сложности, калорийности
-- 💾 Сохранение рецептов в JSON файлы
-- 📱 Удобный интерфейс в Telegram
+## Run locally
 
-## 🚀 Быстрый старт
+1. Create `.env` from `.env.example`
+2. Install dependencies:
+   - `pip install -r requirements.txt`
+3. Start bot:
+   - `python run.py`
+4. Start API:
+   - `uvicorn api:app --reload`
 
-### Предварительные требования
+## Docker
 
-- Python 3.8 или выше
-- Telegram Bot Token (получить у [@BotFather](https://t.me/botfather))
-- GitHub Token с доступом к Models# recipe-parser-bot
+1. Create `.env` from `.env.example`
+2. Build and run:
+   - `docker compose up --build`
+3. API will be available at:
+   - `http://localhost:8000`
