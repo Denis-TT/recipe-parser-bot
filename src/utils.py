@@ -4,35 +4,28 @@ import os
 from datetime import datetime
 from typing import Dict, Any, Optional
 
+from localization import Localization
+
+_loc = Localization("ru")
+
 def format_recipe_for_telegram(recipe: Dict[str, Any]) -> str:
     """Форматирование рецепта для Telegram с КБЖУ"""
     if not recipe:
         return "❌ Не удалось обработать рецепт"
     
-    # Заголовок с эмодзи по типу блюда
-    meal_emojis = {
-        "завтрак": "🍳",
-        "обед": "🍲",
-        "ужин": "🍽",
-        "десерт": "🍰",
-        "закуска": "🥗",
-        "напиток": "🥤",
-        "перекус": "🥨"
-    }
-    
-    meal_type = recipe.get('meal_type', 'основное блюдо')
-    emoji = meal_emojis.get(meal_type.lower(), "🍴")
+    meal_type = Localization.normalize_meal_type(recipe.get("meal_type", "other"))
+    difficulty = Localization.normalize_difficulty(recipe.get("difficulty", "medium"))
+    cuisine = Localization.normalize_cuisine(recipe.get("cuisine", "other"))
+    emoji = _loc.get_meal_type_emoji(meal_type)
     
     title = recipe.get('title', 'Без названия')
     text = f"{emoji} *{title}*\n\n"
     
     # Основная информация
     info_parts = []
-    if recipe.get('cuisine'):
-        info_parts.append(f"🍽 {recipe['cuisine']}")
-    info_parts.append(f"📋 {meal_type}")
-    if recipe.get('difficulty'):
-        info_parts.append(f"📊 {recipe['difficulty']}")
+    info_parts.append(f"🍽 {_loc.get_cuisine_name(cuisine)}")
+    info_parts.append(f"📋 {_loc.get_meal_type_display(meal_type)}")
+    info_parts.append(f"📊 {_loc.get_difficulty_display(difficulty)}")
     
     text += " | ".join(info_parts) + "\n\n"
     

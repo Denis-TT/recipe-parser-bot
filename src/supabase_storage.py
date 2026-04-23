@@ -12,6 +12,7 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime
 
 from supabase import create_client, Client
+from localization import Localization
 
 logger = logging.getLogger(__name__)
 
@@ -49,14 +50,16 @@ class SupabaseRecipeStorage:
         Returns:
             Сохраненный рецепт с ID
         """
+        recipe_data = Localization.normalize_recipe(recipe_data)
+
         # Подготовка данных
         db_recipe = {
             "user_id": user_id,
             "title": recipe_data.get("title", "Без названия"),
             "description": recipe_data.get("description", ""),
-            "cuisine": recipe_data.get("cuisine", "интернациональная"),
+            "cuisine": recipe_data.get("cuisine", "other"),
             "meal_type": recipe_data.get("meal_type", "other"),
-            "difficulty": recipe_data.get("difficulty", "средне"),
+            "difficulty": recipe_data.get("difficulty", "medium"),
             "prep_time": recipe_data.get("prep_time", 0),
             "cook_time": recipe_data.get("cook_time", 0),
             "total_time": recipe_data.get("total_time", 0),
@@ -81,7 +84,11 @@ class SupabaseRecipeStorage:
             result = self.client.table("recipes").insert(db_recipe).execute()
             
             if result.data:
-                logger.info(f"✅ Рецепт сохранен в Supabase: {db_recipe['title']}")
+                logger.info(
+                    "✅ Рецепт сохранен в Supabase: %s | meal_type=%s",
+                    db_recipe["title"],
+                    db_recipe["meal_type"],
+                )
                 return result.data[0]
             else:
                 raise Exception("Нет данных в ответе")
@@ -197,46 +204,21 @@ class SupabaseRecipeStorage:
     
     def get_categories(self, user_id: int) -> List[Dict[str, Any]]:
         """Получение категорий с количеством рецептов"""
-        try:
-            result = self.client.rpc("get_user_categories", {"p_user_id": user_id}).execute()
-            if result.data:
-                normalized_categories = []
-                for item in result.data:
-                    key = self._normalize_category_key(item.get("key", "other"))
-                    normalized_categories.append(
-                        {
-                            "key": key,
-                            "name": item.get("name", self._category_name(key)),
-                            "emoji": item.get("emoji", self._category_emoji(key)),
-                            "count": item.get("count", 0),
-                        }
-                    )
-                return normalized_categories
-            logger.info("RPC get_user_categories вернул пустой ответ, используем fallback")
-        except Exception as e:
-            logger.warning(f"RPC get_user_categories не сработал: {e}, используем fallback")
-
-        # Fallback: группировка на клиенте
         recipes = self.get_user_recipes(user_id, limit=1000)
-
         categories = {}
-        emoji_map = {
-            "breakfast": "🍳", "lunch": "🍲", "dinner": "🍽️",
-            "dessert": "🍰", "snack": "🥨", "salad": "🥗",
-            "soup": "🥣", "baking": "🧁", "drink": "🥤", "other": "📦"
-        }
-        
+
         for recipe in recipes:
-            meal_type = self._normalize_category_key(recipe.get("meal_type", "other"))
+            meal_type = Localization.normalize_meal_type(recipe.get("meal_type", "other"))
             if meal_type not in categories:
                 categories[meal_type] = {
                     "key": meal_type,
                     "name": self._category_name(meal_type),
-                    "emoji": emoji_map.get(meal_type, "🍴"),
+                    "emoji": self._category_emoji(meal_type),
                     "count": 0
                 }
             categories[meal_type]["count"] += 1
 
+        logger.info("📂 Категории: %s", list(categories.keys()))
         return sorted(categories.values(), key=lambda x: x["count"], reverse=True)
 
     @staticmethod

@@ -3,6 +3,8 @@ import aiohttp
 import logging
 from typing import Dict, Any
 
+from localization import Localization
+
 logger = logging.getLogger(__name__)
 
 class GitHubModelNormalizer:
@@ -19,7 +21,7 @@ class GitHubModelNormalizer:
     "description": "Краткое описание",
     "cuisine": "Кухня мира",
     "meal_type": "breakfast/lunch/dinner/dessert/snack/salad/soup/baking/drink/other",
-    "difficulty": "легко/средне/сложно",
+    "difficulty": "easy/medium/hard",
     "prep_time": 20,
     "cook_time": 30,
     "total_time": 50,
@@ -109,28 +111,7 @@ class GitHubModelNormalizer:
                     content = content.strip()
                     
                     result = json.loads(content)
-
-                    # Маппинг на случай, если модель вернула meal_type на кириллице
-                    meal_type_map = {
-                        "завтрак": "breakfast",
-                        "обед": "lunch",
-                        "ужин": "dinner",
-                        "десерт": "dessert",
-                        "перекус": "snack",
-                        "закуска": "snack",
-                        "салат": "salad",
-                        "суп": "soup",
-                        "выпечка": "baking",
-                        "напиток": "drink",
-                        "другое": "other",
-                        "основное блюдо": "dinner",
-                    }
-
-                    meal_type = str(result.get("meal_type", "other")).strip().lower()
-                    if meal_type in meal_type_map:
-                        result["meal_type"] = meal_type_map[meal_type]
-                    else:
-                        result["meal_type"] = meal_type or "other"
+                    result = Localization.normalize_recipe(result)
                     
                     # Проверяем и исправляем КБЖУ на 100г если оно неправильное
                     serving = result.get('servings', 1)
@@ -147,7 +128,11 @@ class GitHubModelNormalizer:
                                 nutrition_100[key] = round(nutrition_per_serving[key] * 100 / portion_weight)
                         result['nutrition'] = nutrition_100
                     
-                    logger.info(f"✅ Рецепт обработан: {result.get('title')}")
+                    logger.info(
+                        "✅ Рецепт нормализован: %s | meal_type=%s",
+                        result.get("title"),
+                        result.get("meal_type"),
+                    )
                     return result
                     
         except Exception as e:
@@ -159,8 +144,8 @@ class GitHubModelNormalizer:
             "title": f"Ошибка обработки",
             "description": f"Не удалось обработать: {error}",
             "cuisine": "",
-            "meal_type": "основное блюдо",
-            "difficulty": "",
+            "meal_type": "other",
+            "difficulty": "medium",
             "prep_time": 0,
             "cook_time": 0,
             "total_time": 0,

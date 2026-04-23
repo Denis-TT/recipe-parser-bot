@@ -18,6 +18,8 @@ import logging
 from dataclasses import dataclass, asdict
 from enum import Enum
 
+from localization import Localization
+
 logger = logging.getLogger(__name__)
 
 
@@ -407,6 +409,8 @@ class RecipeStorage:
         Raises:
             ValueError: Если рецепт не прошел валидацию
         """
+        recipe_data = Localization.normalize_recipe(recipe_data)
+
         # Валидация
         is_valid, error_msg = self._validate_recipe(recipe_data)
         if not is_valid:

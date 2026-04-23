@@ -26,6 +26,7 @@ from telegram.ext import (
 
 from normalizer_github import GitHubModelNormalizer
 from parser import RecipeParser
+from localization import Localization
 from storage import RecipeStorage
 from utils import format_recipe_for_telegram, validate_url
 
@@ -68,6 +69,7 @@ class RecipeBot:
         self.telegram_token = telegram_token
         self.parser = RecipeParser()
         self.normalizer = GitHubModelNormalizer(github_token)
+        self.loc = Localization("ru")
         self.storage = RecipeStorage()
         self.temp_recipes: Dict[int, Dict[str, Any]] = {}
         self.last_request_at: Dict[int, float] = {}
@@ -328,26 +330,23 @@ class RecipeBot:
 
         if not categories:
             await update.message.reply_text(
-                "📭 *Пока нет сохраненных рецептов*\n\n"
-                "Отправьте ссылку на рецепт и нажмите «✅ Да, сохранить».",
+                "📭 *Пока нет сохраненных рецептов*",
                 parse_mode=ParseMode.MARKDOWN,
             )
             return
 
         keyboard = []
         for cat in categories:
-            latin_key = self._normalize_category_key(cat.get("key", "other"))
-            display_name = self.MEAL_TYPE_NAMES.get(latin_key, latin_key)
-            callback_data = f"cat_{latin_key}"
-            logger.info("Создана кнопка категории: %s", callback_data)
-            keyboard.append(
-                [
-                    InlineKeyboardButton(
-                        f"{display_name} ({cat['count']})",
-                        callback_data=callback_data,
-                    )
-                ]
+            latin_key = Localization.normalize_meal_type(cat.get("key", "other"))
+            display_name = self.loc.get_meal_type_display(latin_key)
+            count = cat.get("count", 0)
+
+            button = InlineKeyboardButton(
+                f"{display_name} ({count})",
+                callback_data=f"cat_{latin_key}",
             )
+            keyboard.append([button])
+            logger.info("Создана кнопка категории: cat_%s", latin_key)
 
         await update.message.reply_text(
             "📚 *Ваши сохраненные рецепты*\n\nВыберите категорию:",
@@ -378,8 +377,9 @@ class RecipeBot:
                 )
                 return
             if data.startswith("cat_"):
-                category = data[len("cat_") :]
-                await self.show_recipes_in_category(query, user_id, category)
+                latin_key = data.replace("cat_", "")
+                logger.info("→ Открываем категорию: %s", latin_key)
+                await self.show_recipes_in_category(query, user_id, latin_key)
             elif data.startswith("view_"):
                 payload = data[len("view_") :]
                 if "_" in payload:
