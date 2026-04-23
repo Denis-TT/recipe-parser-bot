@@ -20,10 +20,16 @@ class GitHubModelNormalizer:
             "You are an expert chef and nutritionist. Extract structured recipe JSON only. "
             "meal_type must be one of: breakfast,lunch,dinner,dessert,snack,salad,soup,baking,drink,other."
         )
+        if not github_token:
+            logger.error("GITHUB_TOKEN is empty. Normalization requests will fail.")
 
     async def normalize(self, raw_text: str) -> Dict[str, Any]:
         if not raw_text:
+            logger.warning("Normalization skipped: empty raw_text received.")
             return self._error_payload("Empty text")
+        if not self._github_token:
+            logger.error("Normalization failed: missing GitHub token.")
+            return self._error_payload("Missing GitHub token")
 
         payload = {
             "model": self._model,
@@ -49,7 +55,18 @@ class GitHubModelNormalizer:
                 ) as response:
                     if response.status != 200:
                         error_text = await response.text()
-                        logger.error("GitHub model API error: %s %s", response.status, error_text)
+                        if response.status in (401, 403):
+                            logger.error(
+                                "GitHub model auth error: status=%s. Check GITHUB_TOKEN validity/permissions. body=%s",
+                                response.status,
+                                error_text[:500],
+                            )
+                        else:
+                            logger.error(
+                                "GitHub model API error: status=%s body=%s",
+                                response.status,
+                                error_text[:500],
+                            )
                         return self._error_payload(f"API error {response.status}")
                     data = await response.json()
         except Exception as error:
@@ -83,6 +100,7 @@ class GitHubModelNormalizer:
         return {
             "title": "Recipe parsing error",
             "description": f"Failed to normalize recipe: {error}",
+            "error": error,
             "meal_type": "other",
             "ingredients": [],
             "steps": [],
