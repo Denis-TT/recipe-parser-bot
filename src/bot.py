@@ -306,11 +306,17 @@ class RecipeBot:
                 parse_mode=ParseMode.MARKDOWN,
                 disable_web_page_preview=True,
             )
-            await update.message.reply_text(
-                "💾 *Сохранить этот рецепт?*",
-                parse_mode=ParseMode.MARKDOWN,
-                reply_markup=self.get_save_keyboard(),
-            )
+            if recipe.get("title") != "Ошибка обработки рецепта" and recipe.get("ingredients"):
+                await update.message.reply_text(
+                    "💾 *Сохранить этот рецепт?*",
+                    parse_mode=ParseMode.MARKDOWN,
+                    reply_markup=self.get_save_keyboard(),
+                )
+            else:
+                await update.message.reply_text(
+                    "❌ *Не удалось обработать рецепт.*\nПопробуйте другую ссылку.",
+                    parse_mode=ParseMode.MARKDOWN,
+                )
 
         except Exception as error:
             logger.error("❌ Ошибка обработки URL: %s", error, exc_info=True)
